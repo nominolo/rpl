@@ -55,12 +55,20 @@ instance Pretty Expr where
     ELit l -> ppr l
     EVar v -> ppr v
     ELam ps e -> 
-        parens $ 
+        parens $
           hang (char '\\' <> sep (map ppr ps) <+> text "->") 2 (ppr e)
-    EApp e1 e2 -> parens (ppr e1 <+> ppr e2)
+    EApp e1 e2 -> ppr_app e1 [e2]
     ELet v e1 e2 -> 
         text "let" <+> ppr v <+> char '=' <+> ppr e1 <+> text "in" $$
         ppr e2
+
+-- | Only print outermost parens for nested applications. I. e.,
+--
+--     (((f x) y) z)   ~~>   (f x y z)
+-- 
+ppr_app :: Expr -> [Expr] -> Doc
+ppr_app (EApp e1 e2) es = ppr_app e1 (e2 : es)
+ppr_app f es            = parens (ppr f <+> sep (map ppr es))
 
 instance Pretty Pat where
   ppr pat = case pat of
