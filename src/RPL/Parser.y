@@ -37,12 +37,22 @@ var    :: { Id }
 literal :: { Lit }
          : INTEGER       { let L _ (TokInt i) = $1 in IntLit i }
 
-exp    :: { Expr }
-        : 'let' var '=' exp 'in' exp   { ELet $2 $4 $6 }
-        | var                          { EVar $1 }
-        | literal                      { ELit $1 }
-        | '\\' var '->' exp            { ELam $2 $4 }
-        | '(' exp ')'                  { $2 }
+exp     :: { Expr }
+        : exp10                        { $1 }
+
+exp10  :: { Expr }
+     : 'let' var '=' exp 'in' exp   { ELet $2 $4 $6 }
+     | '\\' var '->' exp            { ELam $2 $4 }
+     | fexp                         { $1 }
+
+fexp   :: { Expr }
+     : aexp                         { $1 }
+     | fexp aexp                    { EApp $1 $2 }
+
+aexp   :: { Expr }
+     : var                          { EVar $1 }
+     | literal                      { ELit $1 }
+     | '(' exp ')'                  { $2 }
 
 {
 happyError :: ParseM a
