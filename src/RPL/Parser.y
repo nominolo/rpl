@@ -28,14 +28,24 @@ INTEGER          { L _ (TokInt _) }
 %tokentype { (Located Token) }
 %%
 
+-- * Main Entry Point
+
 program :: { Expr }
         : exp            { $1 }
+
+-- * Expressions
+
+-- ** Variables
 
 var    :: { Id }
         : VARID          { let L _ (TokVar n) = $1 in Id n }
 
+-- ** Literals
+
 literal :: { Lit }
          : INTEGER       { let L _ (TokInt i) = $1 in IntLit i }
+
+-- ** Other Expressions
 
 exp     :: { Expr }
         : exp10                        { $1 }
@@ -53,6 +63,8 @@ aexp   :: { Expr }
      : var                          { EVar $1 }
      | literal                      { ELit $1 }
      | '(' exp ')'                  { $2 }
+
+-- * Patterns
 
 pats :: { [Pat] }
      : {- empty -}                  { [] }
