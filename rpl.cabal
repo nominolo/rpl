@@ -29,3 +29,11 @@ Library
                               RPL.Utils.Pretty
                               RPL.Utils.SrcLoc
 
+Executable rplc
+  Hs-Source-Dirs:             src
+  Other-Modules:              RPL.Syntax
+                              RPL.Lexer
+                              RPL.Parser
+                              RPL.Utils.SrcLoc
+                              RPL.Utils.Pretty
+  Main-Is:                    Main.hs
