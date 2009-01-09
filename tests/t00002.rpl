@@ -1,0 +1,4 @@
+let tuple = \x -> \y -> \k -> k x y in
+let main = tuple 1 2 (\x -> \y -> 42) in
+main
+
