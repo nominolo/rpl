@@ -42,7 +42,7 @@ exp     :: { Expr }
 
 exp10  :: { Expr }
      : 'let' var '=' exp 'in' exp   { ELet $2 $4 $6 }
-     | '\\' var '->' exp            { ELam $2 $4 }
+     | '\\' pats '->' exp            { ELam $2 $4 }
      | fexp                         { $1 }
 
 fexp   :: { Expr }
@@ -53,6 +53,13 @@ aexp   :: { Expr }
      : var                          { EVar $1 }
      | literal                      { ELit $1 }
      | '(' exp ')'                  { $2 }
+
+pats :: { [Pat] }
+     : {- empty -}                  { [] }
+     | pat pats                     { $1 : $2 }
+
+pat :: { Pat }
+     : var                          { VarPat $1 }
 
 {
 happyError :: ParseM a
