@@ -1,0 +1,10 @@
+# ----------------------------------------------------------------------
+# Customise this file for your system.
+#
+
+HC      = ghc
+PKG     = ghc-pkg
+HADDOCK = haddock
+
+# path to 'cabal' program from the 'cabal-install' tool.
+CABAL_INSTALL = cabal
