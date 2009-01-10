@@ -7,16 +7,16 @@
 -- Stability   : experimental
 -- Portability : portable
 --
-module RPL.Syntax where
+module RPL.Syntax (
+  module RPL.Syntax,
+  module RPL.Names
+) where
 
+import RPL.Names
 import RPL.Utils.Pretty
 
 ------------------------------------------------------------------------
 -- * Datatypes
-
--- | An identifier.
-data Id = Id String
-  deriving (Show)
 
 -- | A Literal.
 data Lit
@@ -42,9 +42,6 @@ data Pat
 
 ------------------------------------------------------------------------
 -- * Pretty Instances
-
-instance Pretty Id where
-  ppr (Id v) = text v
 
 instance Pretty Lit where
   ppr (IntLit i) = int i
