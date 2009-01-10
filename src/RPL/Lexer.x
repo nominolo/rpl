@@ -6,6 +6,7 @@
 
 module RPL.Lexer where
 
+import RPL.Utils.Monads
 import RPL.Utils.SrcLoc
 import RPL.Error
 
@@ -44,29 +45,11 @@ tokens :-
 -- It is implemented as state+CPS monad with two continuations: one for
 -- success, one for failure.
 -- 
-newtype ParseM a
-  = ParseM { unParseM :: forall r.
-                         (LexState -> a -> r)
-                      -> (SourceError -> r)
-                      -> LexState
-                      -> r 
-           }
-
-instance Functor ParseM where
-  fmap f m = ParseM $ \k e s -> unParseM m (\s' a -> k s' (f a)) e s
-
-instance Monad ParseM where
-  return a = ParseM $ \k _ s -> k s a
-  (ParseM f) >>= g  = ParseM $ \k e s -> f (\s' a -> unParseM (g a) k e s') e s
-
-instance Applicative ParseM where
-  pure a = ParseM $ \k _ s -> k s a
-  mf <*> mx = ParseM $ \k e s -> 
-                unParseM mf (\s' f -> unParseM mx (\s'' x -> k s'' (f x)) e s') e s
+type ParseM a = StrictStateErrorM LexState SourceError a
 
 -- | Signal an error in the parse monad.  Immediately aborts parsing.
 parseMError :: SrcSpan -> ErrorMessage -> ParseM a
-parseMError span err = ParseM $ \_ e _ -> e (SourceError span err)
+parseMError span err = throwError (SourceError span err)
 
 -- ** The Lexer State
 
@@ -82,9 +65,7 @@ data LexState = LexState {
     }
 
 setLastLoc :: SrcSpan -> ParseM ()
-setLastLoc span = ParseM $ \k _ s ->
-                    let s' = s { lex_last_loc = span } in
-                    s' `seq` k s' ()
+setLastLoc span = modifyState $ \s -> s { lex_last_loc = span }
 
 -- ** The interface for Alex
 
@@ -110,17 +91,17 @@ alexGetChar (AI p o _ bs) =
 -- * Our utils
 
 getInput :: ParseM AlexInput
-getInput = ParseM $ \k _ s -> 
-             k s (AI (lex_pos s) (lex_offs s) (lex_chr s) (lex_inp s))
+getInput = do s <- getState
+              return (AI (lex_pos s) (lex_offs s) (lex_chr s) (lex_inp s))
 
 setInput :: AlexInput -> ParseM ()
-setInput (AI p o c bs) = 
-    ParseM $ \k _ s -> 
-        let s' = s { lex_pos = p, lex_chr = c, lex_inp = bs, lex_offs = o }
-        in k s' ()
+setInput (AI p o c bs) = do
+    s <- getState
+    let s' = s { lex_pos = p, lex_chr = c, lex_inp = bs, lex_offs = o }
+    setState s'
                        
 getLexState :: ParseM Int
-getLexState = ParseM $ \k _ s -> k s (lex_scd s)
+getLexState = gets lex_scd
 
 lexToken :: ParseM (Located Token)
 lexToken = do
@@ -155,7 +136,7 @@ lexer cont = do
 runParseM :: ParseM a 
         -> UTF8.ByteString -> SrcLoc 
         -> Either SourceError a
-runParseM m buf loc = unParseM m (\_ -> Right) Left initState
+runParseM m buf loc = unSSEM m (\_ -> Right) Left initState
   where
     initState = LexState loc buf 0 '\n' 0 noSrcSpan
 
@@ -166,7 +147,7 @@ runParseM m buf loc = unParseM m (\_ -> Right) Left initState
 -- the partial result could be extracted even in the case of an error.
 lexTokenStream :: UTF8.ByteString -> SrcLoc 
                -> Either SourceError [Located Token]
-lexTokenStream buf loc = unParseM go (\_ -> Right) Left initState
+lexTokenStream buf loc = unSSEM go (\_ -> Right) Left initState
     where initState = LexState loc buf 0 '\n' 0 noSrcSpan
           go = do
             ltok <- lexer return
@@ -175,8 +156,9 @@ lexTokenStream buf loc = unParseM go (\_ -> Right) Left initState
               _ -> liftM (ltok:) go
 
 parseFail :: ParseM a
-parseFail = ParseM $ \_ e s ->
-              e (SourceError (lex_last_loc s) ParseError)
+parseFail = do
+    s <- getState
+    parseMError (lex_last_loc s) ParseError
 
 -- The token type:
 data Token 
