@@ -23,9 +23,9 @@ instance Applicative (StrictStateErrorM s e) where
   mf <*> mx = SSEM $ \k e s -> 
                 unSSEM mf (\s' f -> unSSEM mx (\s'' x -> k s'' (f x)) e s') e s
 
-runStrictStateErrorM :: StrictStateErrorM s e a -> s -> Either e (s,a)
+runStrictStateErrorM :: StrictStateErrorM s e a -> s -> Either e a
 runStrictStateErrorM m s0 =
-  unSSEM m (\s a -> Right (s, a)) Left s0
+  unSSEM m (\s a -> Right a) Left s0
 
 getState :: StrictStateErrorM s e s
 getState = SSEM $ \k _ s -> k s s
