@@ -2,6 +2,7 @@
 --
 module RPL.Error where
 
+import RPL.Names
 import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
 
@@ -13,6 +14,7 @@ data SourceError = SourceError SrcSpan ErrorMessage
 data ErrorMessage
   = LexicalError
   | ParseError
+  | NotInScope Id
   deriving (Eq, Show)
 
 ------------------------------------------------------------------------
@@ -25,3 +27,5 @@ instance Pretty ErrorMessage where
   ppr m = case m of
     LexicalError -> wrappingText "lexical error"
     ParseError -> wrappingText "parse error"
+    NotInScope name ->
+        hang (wrappingText "Not in scope" <> colon) 2 (ppr name)

@@ -4,7 +4,7 @@ import RPL.Utils.Pretty
 
 -- | An identifier.
 data Id = Id String
-  deriving (Show)
+  deriving (Eq, Show)
 
 idString :: Id -> String
 idString (Id n) = n
