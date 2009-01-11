@@ -52,7 +52,7 @@ exp     :: { Expr }
 
 exp10  :: { Expr }
      : 'let' var '=' exp 'in' exp   { ELet $2 $4 $6 }
-     | '\\' pats '->' exp            { ELam $2 $4 }
+     | '\\' pats '->' exp           { mkLam $2 $4 }
      | fexp                         { $1 }
 
 fexp   :: { Expr }

@@ -28,10 +28,13 @@ data Lit
 data Expr
   = ELit Lit             -- l
   | EVar Id              -- x
-  | ELam [Pat] Expr      -- \ x_1 ... x_n -> E
+  | ELam Pat Expr        -- \ x -> E
   | EApp Expr Expr       -- E F
   | ELet Id Expr Expr    -- let x = E in F
   deriving (Show)
+
+mkLam :: [Pat] -> Expr -> Expr  -- \ x_1 ... x_n -> E
+mkLam ps e = foldr ELam e ps
 
 type Program = Expr
 
@@ -51,13 +54,15 @@ instance Pretty Expr where
   ppr exp = case exp of
     ELit l -> ppr l
     EVar v -> ppr v
-    ELam ps e -> 
-        parens $
-          hang (char '\\' <> sep (map ppr ps) <+> text "->") 2 (ppr e)
+    ELam p e -> ppr_lam e [p]
     EApp e1 e2 -> ppr_app e1 [e2]
     ELet v e1 e2 -> 
         text "let" <+> ppr v <+> char '=' <+> ppr e1 <+> text "in" $$
         ppr e2
+
+ppr_lam (ELam p e) ps = ppr_lam e (p:ps)
+ppr_lam e ps =
+    parens $ hang (char '\\' <> sep (map ppr (reverse ps)) <+> text "->") 2 (ppr e)
 
 -- | Only print outermost parens for nested applications. I. e.,
 --
