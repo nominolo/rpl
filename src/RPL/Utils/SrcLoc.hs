@@ -125,6 +125,8 @@ instance Pretty SrcSpan where
         text f <> colon <> int l <> colon <> int c
     UnhelpfulSpan s -> text s
 
+-- ** Constructing SrcSpans
+
 -- | Construct a source span from two [SrcLoc]s.
 mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
 mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
@@ -140,6 +142,20 @@ mkSrcSpan loc1 loc2
 
 noSrcSpan :: SrcSpan
 noSrcSpan = UnhelpfulSpan "<no location info>"
+
+-- ** Selectors
+
+srcSpanStartLoc :: SrcSpan -> SrcLoc
+srcSpanStartLoc (UnhelpfulSpan s)                   = UnhelpfulLoc s
+srcSpanStartLoc (SrcSpanOneLine f l c1 _ o1 _)      = SrcLoc f l c1 o1
+srcSpanStartLoc (SrcSpanMultiLine f l1 c1 _ _ o1 _) = SrcLoc f l1 c1 o1
+srcSpanStartLoc (SrcSpanPoint f l c o)              = SrcLoc f l c o
+
+srcSpanEndLoc :: SrcSpan -> SrcLoc
+srcSpanEndLoc (UnhelpfulSpan s)                   = UnhelpfulLoc s
+srcSpanEndLoc (SrcSpanOneLine f l _ c2 _ o2)      = SrcLoc f l c2 o2
+srcSpanEndLoc (SrcSpanMultiLine f _ _ l2 c2 _ o2) = SrcLoc f l2 c2 o2
+srcSpanEndLoc (SrcSpanPoint f l c o)              = SrcLoc f l c o
 
 ------------------------------------------------------------------------
 
