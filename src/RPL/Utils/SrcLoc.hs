@@ -143,6 +143,15 @@ mkSrcSpan loc1 loc2
 noSrcSpan :: SrcSpan
 noSrcSpan = UnhelpfulSpan "<no location info>"
 
+extendLeft :: SrcLoc -> SrcSpan -> SrcSpan
+extendLeft l s = mkSrcSpan l (srcSpanEndLoc s)
+
+extendRight :: SrcSpan -> SrcLoc -> SrcSpan
+extendRight s l = mkSrcSpan (srcSpanStartLoc s) l
+
+combineSpans :: SrcSpan -> SrcSpan -> SrcSpan
+combineSpans s1 s2 = mkSrcSpan (srcSpanStartLoc s1) (srcSpanEndLoc s2)
+
 -- ** Selectors
 
 srcSpanStartLoc :: SrcSpan -> SrcLoc

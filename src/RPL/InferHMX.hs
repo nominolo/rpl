@@ -30,7 +30,7 @@ genId prefix = do i <- incCtr
 type Env = [(Id, TypeScheme)]
 
 genConstraints :: Env -> Expr -> TcM (Constraint, Id)
-genConstraints env (ELit lit) = do
+genConstraints env (ELit _ lit) = do
     l <- genId "lit"
     let expected_type =
           case lit of
@@ -42,9 +42,9 @@ genConstraints env (ELit lit) = do
 --      x:(forall as. D => t) \in env    b fresh
 --     ------------------------------------------
 --       env ; x |- exists as. b === t /\ D # b
-genConstraints env (EVar var) =
+genConstraints env (EVar loc var) =
     case lookup var env of
-      Nothing -> throwError (SourceError noSrcSpan (NotInScope var))
+      Nothing -> throwError (SourceError loc (NotInScope var))
       Just scheme -> do
         b <- genId (idString var)
         let d = tsConstaint scheme
@@ -57,7 +57,7 @@ genConstraints env (EVar var) =
 --     --------------------------------------------------
 --      env ; \x.e  |- exists a c. (b = a -> c /\ C) # b
 --
-genConstraints env (ELam (VarPat x) e) = do
+genConstraints env (ELam _ (VarPat _ x) e) = do
     a <- genId (idString x)
     (cstr, c) <- genConstraints ((x, TsType (TyVar a)):env) e
     b <- genId "lam"
@@ -69,7 +69,7 @@ genConstraints env (ELam (VarPat x) e) = do
 --     -------------------------------------------------------------
 --      env ; e1 e2 |- exists a1 a2. (C1 /\ C2 /\ a1 = a2 -> a) # a
 --
-genConstraints env (EApp e1 e2) = do
+genConstraints env (EApp _ e1 e2) = do
     a <- genId "app"
     (c1, a1) <- genConstraints env e1
     (c2, a2) <- genConstraints env e2
@@ -82,7 +82,7 @@ genConstraints env (EApp e1 e2) = do
 --     -----------------------------------------------------------
 --         env ; let f = e in e' |- (exists a . C1) /\ C3 # b
 --
-genConstraints env (ELet f e e') = do
+genConstraints env (ELet _ (VarPat _ f) e e') = do
     (c1, a) <- genConstraints env e
     (c3, b) <- genConstraints ((f, (TsQual [a] c1 (TyVar a))):env) e'
     return ( (mkExists [a] c1) /\ c3, b)

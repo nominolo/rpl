@@ -37,13 +37,13 @@ program :: { Expr }
 
 -- ** Variables
 
-var    :: { Id }
-        : VARID          { let L _ (TokVar n) = $1 in Id n }
+var    :: { Located Id }
+        : VARID          { let L s (TokVar n) = $1 in L s (Id n) }
 
 -- ** Literals
 
-literal :: { Lit }
-         : INTEGER       { let L _ (TokInt i) = $1 in IntLit i }
+literal :: { Located Lit }
+         : INTEGER       { let L s (TokInt i) = $1 in L s (IntLit i) }
 
 -- ** Other Expressions
 
@@ -51,17 +51,25 @@ exp     :: { Expr }
         : exp10                        { $1 }
 
 exp10  :: { Expr }
-     : 'let' var '=' exp 'in' exp   { ELet $2 $4 $6 }
-     | '\\' pats '->' exp           { mkLam $2 $4 }
+     : 'let' pat '=' exp 'in' exp   { let s1 = getLoc $1 in
+                                      let s2 = exprSpan $6 in
+                                      let s = combineSpans s1 s2 in
+                                      ELet s $2 $4 $6 }
+     | '\\' pats '->' exp           { mkLam (getLoc $1) $2 $4 }
      | fexp                         { $1 }
 
 fexp   :: { Expr }
      : aexp                         { $1 }
-     | fexp aexp                    { EApp $1 $2 }
+     | fexp aexp                    { let s = exprSpan $1 `combineSpans` exprSpan $2
+                                      in EApp s $1 $2 }
 
 aexp   :: { Expr }
-     : var                          { EVar $1 }
-     | literal                      { ELit $1 }
+     : var                          { let v = unLoc $1 in
+                                      let s = getLoc $1 in
+                                      EVar s v }
+     | literal                      { let l = unLoc $1 in
+                                      let s = getLoc $1 in
+                                      ELit s l }
      | '(' exp ')'                  { $2 }
 
 -- * Patterns
@@ -71,7 +79,9 @@ pats :: { [Pat] }
      | pat pats                     { $1 : $2 }
 
 pat :: { Pat }
-     : var                          { VarPat $1 }
+     : var                          { let v = unLoc $1 in
+                                      let s = getLoc $1 in
+                                      VarPat s v }
 
 {
 happyError :: ParseM a
