@@ -45,6 +45,8 @@ infix 4 ===
 t1 === t2 = CEquals t1 t2
 
 (/\) :: Constraint -> Constraint -> Constraint
+CTrue /\ c = c
+c /\ CTrue = c
 c1 /\ c2 = CAnd c1 c2
 
 mkExists :: [Id] -> Constraint -> Constraint
