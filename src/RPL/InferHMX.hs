@@ -4,7 +4,6 @@ module RPL.InferHMX where
 import RPL.Names
 import RPL.Type
 import RPL.Syntax
-import RPL.Constraints
 import RPL.Error
 import RPL.Utils.Monads
 import RPL.Utils.SrcLoc
