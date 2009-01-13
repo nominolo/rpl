@@ -16,8 +16,11 @@ main = do
   case e of
     Left _ -> return ()
     Right e' ->
-      case runTcM (genConstraints [] e') of
+      case runTcM (do (c, a) <- genConstraints [] e'
+                      c' <- normaliseConstr c
+                      return (c, c', a)) of
         Left err -> pprint err
-        Right (c, a) -> do
+        Right (c, c', a) -> do
            pprint a
            pprint c
+           pprint c'
