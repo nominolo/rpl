@@ -3,10 +3,14 @@ module RPL.Type where
 import RPL.Names
 import RPL.Utils.Pretty
 
+import Data.Set ( Set )
+import qualified Data.Set as S
+
 data Type
   = TyFun Type Type
   | TyVar Id
-  | TyCon Id [Type] 
+  | TyCon Id [Type]
+  deriving (Eq, Show)
 
 type Term = Type
 
@@ -15,6 +19,7 @@ data Constraint
   | CEquals Term Term
   | CAnd Constraint Constraint
   | CExists Id Constraint
+  deriving (Eq, Show)
 
 ------------------------------------------------------------------------
 -- * Type Scheme
@@ -22,6 +27,7 @@ data Constraint
 data TypeScheme
   = TsType Type
   | TsQual [Id] Constraint Type
+  deriving (Eq, Show)
 
 tsVars :: TypeScheme -> [Id]
 tsVars (TsType _) = []
@@ -37,6 +43,21 @@ tsType (TsQual _ _ t) = t
 
 ------------------------------------------------------------------------
 -- * Helpers
+
+-- ** Free Variables
+
+-- | Free Type Variables.
+ftv :: Type -> Set Id
+ftv (TyVar v)     = S.singleton v
+ftv (TyFun t1 t2) = S.union (ftv t1) (ftv t2)
+ftv (TyCon _ ts)  = S.unions (map ftv ts)
+
+-- | Free Type Variables of a type scheme.
+tsFTV :: TypeScheme -> Set Id
+tsFTV (TsType t)      = ftv t
+tsFTV (TsQual vs _ t) = ftv t `S.difference` S.fromList vs
+
+-- ** Constraint Construction
 
 infixr 1 /\
 infix 4 ===
