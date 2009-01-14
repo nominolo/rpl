@@ -12,6 +12,7 @@ import RPL.Syntax
 import RPL.Error
 import RPL.Utils.Monads
 import RPL.Utils.SrcLoc
+import RPL.BuiltIn
 
 import Control.Applicative
 import Data.Monoid
@@ -25,8 +26,8 @@ genConstraints env (ELit _ lit) = do
     l <- genId "lit"
     let expected_type =
           case lit of
-            IntLit _  -> TyCon (Id "Int") []
-            CharLit _ -> TyCon (Id "Char") []
+            IntLit _  -> typeInt
+            CharLit _ -> typeChar
     return (TyVar l === expected_type, l)
 
 --
@@ -52,7 +53,7 @@ genConstraints env (EVar loc var) =
 genConstraints env (ELam _ (VarPat _ x) e) = do
     a <- genId (idString x)
     (cstr, c) <- genConstraints ((x, TsType (TyVar a)):env) e
-    b <- genId "l_"
+    b <- genId "_"
     return (mkExists [a,c] $ (TyVar b) === TyFun (TyVar a) (TyVar c) /\ cstr,
             b)
 
@@ -62,7 +63,7 @@ genConstraints env (ELam _ (VarPat _ x) e) = do
 --      env ; e1 e2 |- exists a1 a2. (C1 /\ C2 /\ a1 = a2 -> a) # a
 --
 genConstraints env (EApp _ e1 e2) = do
-    a <- genId "a_"
+    a <- genId "_"
     (c1, a1) <- genConstraints env e1
     (c2, a2) <- genConstraints env e2
     return ( mkExists [a1, a2] $
@@ -108,7 +109,7 @@ norm c s0 =
         (/\) <$> norm c1 s0 <*> norm c2 s0
 
     CExists v c -> do
-        v' <- genId (idString v ++ "_")
+        v' <- genId (idString v)
         let s' = (v, v') : s0
         norm c s' -- drop the exists, it's implicit at the top-level
 

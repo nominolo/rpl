@@ -8,6 +8,7 @@ import RPL.Lexer
 import RPL.Syntax
 import RPL.Error
 import RPL.Utils.SrcLoc
+import RPL.Utils.Unique
 }
 
 %token
@@ -38,7 +39,8 @@ program :: { Expr }
 -- ** Variables
 
 var    :: { Located Id }
-        : VARID          { let L s (TokVar n) = $1 in L s (Id n) }
+        : VARID          { let L s (TokVar n) = $1 in
+                           L s (Id (uniqueFromInt 0) n) } -- XXX: better unique
 
 -- ** Literals
 
