@@ -2,14 +2,15 @@ module RPL.Type where
 
 import RPL.Names
 import RPL.Utils.Pretty
+import RPL.Utils.Unique
 
 import Data.Set ( Set )
 import qualified Data.Set as S
 
 data Type
-  = TyFun Type Type
-  | TyVar Id
-  | TyCon Id [Type]
+  = TyVar Id
+  | TyCon Id Int
+  | TyApp Type Type
   deriving (Eq, Show)
 
 type Term = Type
@@ -44,13 +45,29 @@ tsType (TsQual _ _ t) = t
 ------------------------------------------------------------------------
 -- * Helpers
 
+-- ** Type Construction
+
+typeFun :: Type
+typeFun = TyCon (Id (uniqueFromInt 3) "->") 2
+
+
+--     x -> y -> z
+--     == ((->) x ((->) y z))
+--     == (((->) x) (((->) y) z))
+--
+--     x -> y == (((->) x) y)
+mkFun :: [Type] -> Type
+mkFun []     = error "mkFun: expects at least one argument"
+mkFun [t]    = t
+mkFun (t:ts) = TyApp (TyApp typeFun t) (mkFun ts)
+
 -- ** Free Variables
 
 -- | Free Type Variables.
 ftv :: Type -> Set Id
 ftv (TyVar v)     = S.singleton v
-ftv (TyFun t1 t2) = S.union (ftv t1) (ftv t2)
-ftv (TyCon _ ts)  = S.unions (map ftv ts)
+ftv (TyCon _ ts)  = S.empty
+ftv (TyApp t1 t2) = S.union (ftv t1) (ftv t2)
 
 -- | Free Type Variables of a type scheme.
 tsFTV :: TypeScheme -> Set Id
@@ -79,18 +96,11 @@ mkExists vars c = foldr CExists c vars
 instance Pretty Type where
   ppr typ = ppr_type typ
 
-ppr_type (TyFun t1 t2) =
-    parens (ppr t1 <+> sep (map ((text "->" <+>) . ppr) (ppr_fun_type t2)))
 ppr_type (TyVar v) = ppr v
-ppr_type (TyCon c ts) = 
-    ppr c <+> sep (map ppr ts)
-
-ppr_fun_type (TyFun t1 t2) = t1 : ppr_fun_type t2
-ppr_fun_type t = [t]
-
--- t1 = pprint (TyFun (TyVar (Id "a")) 
---          (TyFun (TyFun (TyVar (Id "a")) (TyCon (Id "M") [TyVar (Id "b")]))
---                 (TyCon (Id "M") [TyVar (Id "a")])))
+ppr_type (TyCon c _) = ppr c
+ppr_type (TyApp t t') 
+  | t == typeFun = parens (ppr t' <+> ppr t)
+  | otherwise    = parens $ ppr t <+> ppr t'
 
 instance Pretty TypeScheme where
   ppr ts = ppr_type_scheme ts

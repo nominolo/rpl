@@ -54,7 +54,7 @@ genConstraints env (ELam _ (VarPat _ x) e) = do
     a <- genId (idString x)
     (cstr, c) <- genConstraints ((x, TsType (TyVar a)):env) e
     b <- genId "_"
-    return (mkExists [a,c] $ (TyVar b) === TyFun (TyVar a) (TyVar c) /\ cstr,
+    return (mkExists [a,c] $ (TyVar b) === mkFun [TyVar a, TyVar c] /\ cstr,
             b)
 
 --
@@ -67,7 +67,7 @@ genConstraints env (EApp _ e1 e2) = do
     (c1, a1) <- genConstraints env e1
     (c2, a2) <- genConstraints env e2
     return ( mkExists [a1, a2] $
-               c1 /\ c2 /\ (TyVar a1) === TyFun (TyVar a2) (TyVar a)
+               c1 /\ c2 /\ (TyVar a1) === (mkFun [TyVar a2, TyVar a])
            , a)
 
 --
@@ -114,8 +114,8 @@ norm c s0 =
         norm c s' -- drop the exists, it's implicit at the top-level
 
 normTerm :: Subst Id Id -> Term -> Term
-normTerm s (TyCon c ts)   = TyCon c (map (normTerm s) ts)
+normTerm s c@(TyCon _ _)  = c
 normTerm s t@(TyVar v)
   | Just v' <- lookup v s = TyVar v'
   | otherwise             = t
-normTerm s (TyFun t1 t2)  = TyFun (normTerm s t1) (normTerm s t2)
+normTerm s (TyApp t1 t2)  = TyApp (normTerm s t1) (normTerm s t2)
