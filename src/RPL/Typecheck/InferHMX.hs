@@ -1,5 +1,10 @@
 {-# LANGUAGE BangPatterns, PatternGuards #-}
-module RPL.InferHMX where
+module RPL.Typecheck.InferHMX (
+  module RPL.Typecheck.InferHMX,
+  runTcM,
+) where
+
+import RPL.Typecheck.Monad
 
 import RPL.Names
 import RPL.Type
@@ -10,20 +15,6 @@ import RPL.Utils.SrcLoc
 
 import Control.Applicative
 import Data.Monoid
-
-------------------------------------------------------------------------
-
-type TcM a = StrictStateErrorM Int SourceError a
-
-runTcM :: TcM a -> Either SourceError a
-runTcM m = runStrictStateErrorM m 0
-
-incCtr :: TcM Int
-incCtr = do s <- getState; modifyState (+1); return s
-
-genId :: String -> TcM Id
-genId prefix = do i <- incCtr
-                  return $ Id (prefix ++ show i)
 
 ------------------------------------------------------------------------
 

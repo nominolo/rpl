@@ -27,6 +27,10 @@ Library
                               RPL.Lexer
                               RPL.Parser
                               RPL.Syntax
+                              RPL.Type
+                              RPL.Typecheck.Monad
+                              RPL.Typecheck.InferHMX
+                              RPL.Utils.Monads
                               RPL.Utils.Pretty
                               RPL.Utils.SrcLoc
 
@@ -35,6 +39,10 @@ Executable rplc
   Other-Modules:              RPL.Syntax
                               RPL.Lexer
                               RPL.Parser
+                              RPL.Type
+                              RPL.Typecheck.Monad
+                              RPL.Typecheck.InferHMX
+                              RPL.Utils.Monads
                               RPL.Utils.SrcLoc
                               RPL.Utils.Pretty
   Main-Is:                    Main.hs

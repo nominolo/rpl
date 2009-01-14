@@ -5,7 +5,7 @@ import qualified RPL.Lexer as L
 import RPL.Parser
 import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
-import RPL.InferHMX
+import RPL.Typecheck.InferHMX
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 
