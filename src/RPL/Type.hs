@@ -47,6 +47,10 @@ tsType :: TypeScheme -> Type
 tsType (TsType t) = t
 tsType (TsQual _ _ t) = t
 
+mkForall :: [Id] -> Constraint -> Type -> TypeScheme
+mkForall [] CTrue t = TsType t
+mkForall vs c t = TsQual vs c t
+
 ------------------------------------------------------------------------
 -- * Helpers
 
