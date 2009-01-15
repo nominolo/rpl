@@ -1,4 +1,6 @@
-module RPL.Typecheck.Monad where
+module RPL.Typecheck.Monad (
+  TcM, runTcM, genId, throwError,
+) where
 
 import RPL.Names
 import RPL.Error
