@@ -7,6 +7,11 @@ import RPL.Utils.Unique
 import Data.Set ( Set )
 import qualified Data.Set as S
 
+-- Testing
+import Test.QuickCheck
+
+------------------------------------------------------------------------
+
 data Type
   = TyVar Id
   | TyCon Id Int
@@ -128,3 +133,23 @@ ppr_exists (CExists v c) vs = ppr_exists c (v:vs)
 ppr_exists c vs = 
     parens $ hang (text "exists" <+> sep (map ppr (reverse vs)) <+> char '.')
                2 (ppr c)
+
+------------------------------------------------------------------------
+-- * Testing
+
+instance Arbitrary Type where
+  arbitrary = sized $ \n ->
+     if n < 3 then gen_node
+              else gen_node_or_leaf n
+    where
+      gen_node =
+          frequency
+            [(2, TyVar `fmap` arbitrary)
+            ,(1, do (Uppercase n) <- arbitrary
+                    return (TyCon n 0))]
+      gen_node_or_leaf n =
+          frequency
+            [(1,gen_node)
+            ,(5,do t1 <- resize (n `div` 2) arbitrary
+                   t2 <- resize (n `div` 2) arbitrary
+                   return (mkFun [t1, t2]))]
