@@ -40,3 +40,6 @@ wrappingText msg = fsep $ map text $ words msg
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
   ppr (Left a) = ppr a
   ppr (Right b) = ppr b
+
+instance (Pretty a, Pretty b) => Pretty (a,b) where
+  ppr (a,b) = parens (sep [ppr a <> comma, ppr b])
