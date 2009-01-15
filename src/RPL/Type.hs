@@ -16,7 +16,7 @@ data Type
   = TyVar Id
   | TyCon Id Int
   | TyApp Type Type
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 type Term = Type
 

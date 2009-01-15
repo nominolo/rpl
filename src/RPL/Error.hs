@@ -15,6 +15,7 @@ data ErrorMessage
   = LexicalError
   | ParseError
   | NotInScope Id
+  | TypeMismatch String String
   deriving (Eq, Show)
 
 ------------------------------------------------------------------------
@@ -29,3 +30,8 @@ instance Pretty ErrorMessage where
     ParseError -> wrappingText "parse error"
     NotInScope name ->
         hang (wrappingText "Not in scope" <> colon) 2 (ppr name)
+    TypeMismatch t1 t2 ->
+        wrappingText "Could not match expected type:" $$
+        nest 4 (text t1) $$
+        wrappingText "Against inferred type:" $$
+        nest 4 (text t2)

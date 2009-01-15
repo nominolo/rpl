@@ -29,6 +29,8 @@ Library
                               RPL.Syntax
                               RPL.Type
                               RPL.Typecheck.Monad
+                              RPL.Typecheck.Subst
+                              RPL.Typecheck.AlgorithmW
                               RPL.Typecheck.InferHMX
                               RPL.Utils.Monads
                               RPL.Utils.Pretty
@@ -42,6 +44,8 @@ Executable rplc
                               RPL.Parser
                               RPL.Type
                               RPL.Typecheck.Monad
+                              RPL.Typecheck.Subst
+                              RPL.Typecheck.AlgorithmW
                               RPL.Typecheck.InferHMX
                               RPL.Utils.Monads
                               RPL.Utils.SrcLoc
