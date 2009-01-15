@@ -21,6 +21,9 @@ import Text.PrettyPrint
 class Pretty a where
   ppr :: a -> Doc
 
+pretty :: Pretty a => a -> String
+pretty x = render (ppr x)
+
 pprint :: Pretty a => a -> IO ()
 pprint x = putStrLn $ render $ ppr x
 
