@@ -18,7 +18,7 @@ idString :: Id -> String
 idString (Id _ n) = n
 
 instance Pretty Id where
-  ppr (Id u v) = text v <> char '_' <> ppr u
+  ppr (Id u v) = text v <> ifDebugStyle (char '_' <> ppr u)
 
 ------------------------------------------------------------------------
 

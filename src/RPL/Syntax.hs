@@ -91,7 +91,7 @@ ppr_lam e ps =
 --
 --     (((f x) y) z)   ~~>   (f x y z)
 -- 
-ppr_app :: Expr -> [Expr] -> Doc
+ppr_app :: Expr -> [Expr] -> PDoc
 ppr_app (EApp _ e1 e2) es = ppr_app e1 (e2 : es)
 ppr_app f es            = parens (ppr f <+> sep (map ppr es))
 
