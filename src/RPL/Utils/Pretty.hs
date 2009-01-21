@@ -136,7 +136,9 @@ wrappingText msg = fsep $ map text $ words msg
 -- ** Style-specific Combinators
 
 ifDebugStyle :: PDoc -> PDoc
-ifDebugStyle d sty@DebugStyle = d sty
+ifDebugStyle d sty@DebugStyle = P.zeroWidthText "\027[34m" P.<>
+                                d sty P.<>
+                                P.zeroWidthText "\027[0m"
 ifDebugStyle d _ = P.empty
 
 ------------------------------------------------------------------------

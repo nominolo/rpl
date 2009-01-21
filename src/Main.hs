@@ -23,10 +23,10 @@ main = do
         Left err -> pprint err
         Right (c, c', a) -> do
            pprint a
-           pprint c
+           debugPrint c
            pprint c'
 
       case runTcM (toplevelInfer e') of
         Left err -> pprint err
         Right r -> do
-           pprint r
+           debugPrint r
