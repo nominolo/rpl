@@ -14,10 +14,11 @@ import Test.QuickCheck
 
 data Type
   = TyVar Id
-  | TyCon Id Int
+  | TyCon TyCon Int
   | TyApp Type Type
   deriving (Eq, Ord, Show)
 
+type TyCon = Id  -- for now
 type Term = Type
 
 data Constraint
@@ -57,8 +58,10 @@ mkForall vs c t = TsQual vs c t
 -- ** Type Construction
 
 typeFun :: Type
-typeFun = TyCon (Id (uniqueFromInt 3) "->") 2
+typeFun = TyCon funTyCon 2
 
+funTyCon :: TyCon
+funTyCon = Id (uniqueFromInt 3) "->"
 
 --     x -> y -> z
 --     == ((->) x ((->) y z))
@@ -105,11 +108,40 @@ mkExists vars c = foldr CExists c vars
 instance Pretty Type where
   ppr typ = ppr_type typ
 
-ppr_type (TyVar v) = ppr v
-ppr_type (TyCon c _) = ppr c
-ppr_type (TyApp t t') 
-  | t == typeFun = parens (ppr t' <+> ppr t)
-  | otherwise    = parens $ ppr t <+> ppr t'
+ppr_type t = ppr_type' 0 t
+
+ppr_parens True d = parens d
+ppr_parens False d = d
+
+ppr_type' d (TyVar v) = ppr v
+ppr_type' d (TyCon c _) = ppr c
+ppr_type' d (TyApp (TyApp (TyCon c _) t) t')
+  | isInfixTyCon c =
+      let prec = infixTyConPrecedence c
+          (prec_left, prec_right) =
+              case infixTyConAssoc c of
+                AssocLeft  -> (prec,     prec + 1)
+                AssocRight -> (prec + 1, prec)
+                AssocNone  -> (prec + 1, prec + 1)
+      in ppr_parens (d > prec) $
+        ppr_type' prec_left t <+> ppr c <+> ppr_type' prec_right t'
+ppr_type' d (TyApp t t') =
+    ppr_parens (d > 100) $ ppr_type' 100 t <+> ppr_type' 101 t'
+
+-- | `True <=>` type constructor should be written infix instead of prefix.
+isInfixTyCon :: TyCon -> Bool
+isInfixTyCon c = c == funTyCon
+
+-- | Return the precedence of an infix type constructor (a number between 0
+-- and 100).  Type application has highest precedence (100), function arrow
+-- has lowest precedence (0).
+infixTyConPrecedence :: TyCon -> Int
+infixTyConPrecedence _ = 0 -- function
+
+infixTyConAssoc :: TyCon -> Associativity
+infixTyConAssoc c | c == funTyCon = AssocRight
+infixTyConAssoc _ = error "unknown associativity"
+
 
 instance Pretty TypeScheme where
   ppr ts = ppr_type_scheme ts

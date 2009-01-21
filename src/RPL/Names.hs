@@ -20,6 +20,17 @@ idString (Id _ n) = n
 instance Pretty Id where
   ppr (Id u v) = text v <> ifDebugStyle (char '_' <> ppr u)
 
+-- | For an arbitrary infix operator `<>` defines how an expression
+-- 
+--     a <> b <> c
+--
+-- is being parsed.
+data Associativity
+  = AssocLeft   -- ^ Parse as `(a <> b) <> c`
+  | AssocRight  -- ^ Parse as `a <> (b <> c)`
+  | AssocNone   -- ^ Expression is ambiguous, explicit parentheses are
+                -- needed.
+
 ------------------------------------------------------------------------
 
 newtype Uppercase a = Uppercase a
