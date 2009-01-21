@@ -78,6 +78,9 @@ newtype Env t = Env (Map Id t)
 emptyEnv :: Env t
 emptyEnv = Env M.empty
 
+singletonEnv :: Id -> t -> Env t
+singletonEnv x t = Env (M.singleton x t)
+
 lookupEnv :: Env t -> Id -> Maybe t
 lookupEnv (Env m) x = M.lookup x m
 
