@@ -73,22 +73,22 @@ instance HasTySubst TypeScheme where
 
 ------------------------------------------------------------------------
 
-newtype TypeEnv = TypeEnv (Map Id TypeScheme)
+newtype Env t = Env (Map Id t)
 
-emptyTypeEnv :: TypeEnv
-emptyTypeEnv = TypeEnv M.empty
+emptyEnv :: Env t
+emptyEnv = Env M.empty
 
-lookupTypeEnv :: TypeEnv -> Id -> Maybe TypeScheme
-lookupTypeEnv (TypeEnv m) x = M.lookup x m
+lookupEnv :: Env t -> Id -> Maybe t
+lookupEnv (Env m) x = M.lookup x m
 
-extendTypeEnv :: TypeEnv -> Id -> TypeScheme -> TypeEnv
-extendTypeEnv (TypeEnv m) x ts = TypeEnv (M.insert x ts m)
+extendEnv :: Env t -> Id -> t -> Env t
+extendEnv (Env m) x ts = Env (M.insert x ts m)
 
-typeEnvDomain :: TypeEnv -> Set Id
-typeEnvDomain (TypeEnv m) = M.keysSet m
+envDomain :: Env t -> Set Id
+envDomain (Env m) = M.keysSet m
 
-instance HasTySubst TypeEnv where
-  apply s (TypeEnv m) = TypeEnv (M.map (apply s) m)
+instance HasTySubst t => HasTySubst (Env t) where
+  apply s (Env m) = Env (M.map (apply s) m)
 
 ------------------------------------------------------------------------
 

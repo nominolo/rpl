@@ -65,7 +65,10 @@ generalise monos t =
 -- | Infer the type of an expression in the top-level environment.
 --
 toplevelInfer :: Expr -> TcM (TySubst, Type)
-toplevelInfer e = infer emptyTypeEnv e
+toplevelInfer e = infer emptyEnv e
+
+
+type TypeEnv = Env TypeScheme
 
 -- | Infer the type of an expression using Algorithm W.
 --
@@ -75,7 +78,7 @@ infer env (ELit _ l) =
                             IntLit _ -> typeInt
                             CharLit _ -> typeChar)
 infer env (EVar loc var) =
-    case lookupTypeEnv env var of
+    case lookupEnv env var of
       Nothing -> throwError (SourceError loc (NotInScope var))
       Just s -> do
         let as = tsVars s
@@ -86,7 +89,7 @@ infer env (EVar loc var) =
 
 infer env (ELam _ (VarPat _ x) e) = do
     b <- genId (idString x)
-    (s, t) <- infer (extendTypeEnv env x (mkForall [] CTrue (TyVar b))) e
+    (s, t) <- infer (extendEnv env x (mkForall [] CTrue (TyVar b))) e
     return (s, apply s (mkFun [TyVar b, t]))
 
 infer env (EApp loc e1 e2) = do
@@ -101,6 +104,6 @@ infer env (EApp loc e1 e2) = do
 
 infer env (ELet _ (VarPat _ x) e1 e2) = do
     (s1, t1) <- infer env e1
-    let scheme = generalise (typeEnvDomain (apply s1 env)) t1
-    (s2, t2) <- infer (extendTypeEnv (apply s1 env) x scheme) e2
+    let scheme = generalise (envDomain (apply s1 env)) t1
+    (s2, t2) <- infer (extendEnv (apply s1 env) x scheme) e2
     return (s2 `composeTySubst` s1, t2)
