@@ -33,7 +33,7 @@ genConstraints env (ELit _ lit) = do
 --
 --      x:(forall as. D => t) \in env    b fresh
 --     ------------------------------------------
---       env ; x |- exists as. b === t /\ D # b
+--       env ; x |- exists as. b = t /\ D # b
 --
 genConstraints env (EVar loc var) =
     case lookup var env of
