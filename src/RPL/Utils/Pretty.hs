@@ -14,6 +14,11 @@ where
 
 import qualified Text.PrettyPrint as P
 
+import Data.Map ( Map )
+import Data.Set ( Set )
+import qualified Data.Map as M
+import qualified Data.Set as S
+
 ------------------------------------------------------------------------
 -- * The =Pretty= Class
 
@@ -172,3 +177,13 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
 
 instance (Pretty a, Pretty b) => Pretty (a,b) where
   ppr (a,b) = parens (sep [ppr a <> comma, ppr b])
+
+instance Pretty s => Pretty (Set s) where
+  ppr s = braces (fsep (punctuate comma (map ppr (S.toList s))))
+
+instance Pretty a => Pretty [a] where
+  ppr l = brackets (fsep (punctuate comma (map ppr l)))
+
+instance (Pretty k, Pretty a) => Pretty (Map k a) where
+  ppr s = braces (fsep (punctuate comma (map ppr_elem (M.toList s))))
+    where ppr_elem (k, v) = ppr k <> colon <+> ppr v
