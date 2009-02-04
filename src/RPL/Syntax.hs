@@ -80,7 +80,7 @@ instance Pretty Expr where
     ELam _ p e -> ppr_lam e [p]
     EApp _ e1 e2 -> ppr_app e1 [e2]
     ELet _ v e1 e2 -> 
-        text "let" <+> ppr v <+> char '=' <+> ppr e1 <+> text "in" $$
+        keyword "let" <+> ppr v <+> char '=' <+> ppr e1 <+> keyword "in" $$
         ppr e2
 
 ppr_lam (ELam _ p e) ps = ppr_lam e (p:ps)

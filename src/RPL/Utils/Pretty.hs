@@ -133,12 +133,34 @@ wrappingText msg = fsep $ map text $ words msg
 
 ------------------------------------------------------------------------
 
+-- ** Terminal Styles
+
+ansiTermStyle :: String -> PDoc -> PDoc
+ansiTermStyle ansi d sty =
+  P.zeroWidthText ("\027[" ++ ansi ++ "m") P.<>
+  d sty P.<>
+  P.zeroWidthText "\027[0m"
+
+ansiTermStyle2 :: String -> String -> PDoc -> PDoc
+ansiTermStyle2 start end d sty =
+  P.zeroWidthText ("\027[" ++ start ++ "m") P.<>
+  d sty P.<>
+  P.zeroWidthText ("\027[" ++ end ++ "m")
+
+bold :: PDoc -> PDoc
+bold = ansiTermStyle "1"
+
+underline :: PDoc -> PDoc
+underline = ansiTermStyle "4"
+
+keyword :: String -> PDoc
+keyword = bold . text
+
 -- ** Style-specific Combinators
 
 ifDebugStyle :: PDoc -> PDoc
-ifDebugStyle d sty@DebugStyle = P.zeroWidthText "\027[34m" P.<>
-                                d sty P.<>
-                                P.zeroWidthText "\027[0m"
+ifDebugStyle d sty@DebugStyle = 
+  ansiTermStyle "90" d sty
 ifDebugStyle d _ = P.empty
 
 ------------------------------------------------------------------------
