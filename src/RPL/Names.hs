@@ -40,12 +40,12 @@ instance Arbitrary (Uppercase Id) where
   arbitrary = Uppercase `fmap` arbUppercase
 
 arbLowercase = do
-   n <- sized (\n -> elements (take n simpleNames))
+   n <- sized (\n -> elements (take (n+1) simpleNames))
    let i = product (map ord n)
    return (Id (uniqueFromInt i) n)
 
 arbUppercase = do
-   n <- fmap (map toUpper) $ sized (\n -> elements (take n simpleNames))
+   n <- fmap (map toUpper) $ sized (\n -> elements (take (n+1) simpleNames))
    let i = product (map ord n)
    return (Id (uniqueFromInt i) n)
 
