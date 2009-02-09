@@ -29,8 +29,7 @@ emptyTySubst = TySubst M.empty
 --
 composeTySubst :: TySubst -> TySubst -> TySubst
 composeTySubst s1@(TySubst m1) s2@(TySubst m2) =
-   TySubst (M.map (apply s1) m2 `M.union` m1)
-   -- XXX: M.union is left-biased, check that this here is correct
+   TySubst (m1 `M.union` M.map (apply s1) m2)
 
 -- | Extend substitution.  Overwrites existing mappings.
 (//) :: TySubst -> [(Id, Type)] -> TySubst
