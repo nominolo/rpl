@@ -42,6 +42,9 @@ x |-> a = TySubst (M.singleton x a)
 (!) :: TySubst -> Id -> Maybe Type
 (TySubst m) ! x = M.lookup x m
 
+addTySubstBinding :: TySubst -> Id -> Type -> TySubst
+addTySubstBinding (TySubst m) x t = TySubst (M.insert x t m)
+
 delTySubst :: TySubst -> Id -> TySubst
 delTySubst (TySubst m) x = TySubst (M.delete x m)
 

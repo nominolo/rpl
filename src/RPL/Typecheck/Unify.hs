@@ -1,7 +1,10 @@
+{-# LANGUAGE PatternGuards #-}
 module RPL.Typecheck.Unify where
 
 import RPL.Typecheck.Subst
 import RPL.Type
+import Debug.Trace
+import RPL.Utils.Pretty
 
 ------------------------------------------------------------------------
 
@@ -25,3 +28,39 @@ unify (TyApp t1 t2) (TyApp t3 t4) =
             err@(Left _)       -> err
       err@(Left _) -> err
 unify t t'                      = Left (t,t')
+
+unify' :: Type -> Type -> Either (Type, Type) TySubst
+unify' = unify2 emptyTySubst
+
+unifyTypes :: [(Type, Type)] -> Either (Type, Type) TySubst
+unifyTypes us0 = go emptyTySubst us0
+  where
+    go s [] = Right s
+    go s ((t,t'):us) = case unify2 s t t' of
+                         e@(Left _) -> e
+                         Right s'   -> go s' us
+
+-- TODO: kind checking
+unify2 :: TySubst -> Type -> Type -> Either (Type, Type) TySubst
+unify2 subst t1 t2 | trace (pretty (subst, [t1, t2])) False = undefined 
+unify2 subst (TyVar x) t = uVar subst x t
+unify2 subst t (TyVar x) = uVar subst x t
+unify2 subst (TyCon c i) (TyCon c' i')
+  | c == c' && i == i'   = Right subst
+unify2 subst (TyApp t1a t1b) (TyApp t2a t2b) =
+   case unify2 subst t1a t2a of
+     r@(Left _) -> r
+     Right subst' -> unify2 subst' t1b t2b
+unify2 _subst t1 t2      = Left (t1, t2)
+
+uVar :: TySubst -> TyVar -> Type -> Either (Type, Type) TySubst
+uVar subst x t | Just t' <- subst ! x =
+   unify2 subst t' t
+uVar subst x t = uUnrefined subst x t
+
+uUnrefined subst x (TyVar x') 
+  | x == x'               = Right subst
+  | Just t' <- subst ! x' = uUnrefined subst x t'
+uUnrefined subst x t =
+  -- TODO: occurs check
+  Right $ addTySubstBinding subst x t
