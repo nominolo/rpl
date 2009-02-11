@@ -20,6 +20,7 @@ data Type
 
 type TyCon = Id  -- for now
 type Term = Type
+type TyVar = Id
 
 data Constraint
   = CTrue
