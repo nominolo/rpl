@@ -168,6 +168,12 @@ ifDebugStyle d sty@DebugStyle =
   ansiTermStyle "90" d sty
 ifDebugStyle d _ = P.empty
 
+
+-- ** Utils
+
+commaSep :: [PDoc] -> [PDoc]
+commaSep = punctuate comma
+
 ------------------------------------------------------------------------
 -- * Prelude Type Instances
 
