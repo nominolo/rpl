@@ -7,6 +7,7 @@ import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
 
 ------------------------------------------------------------------------
+-- FIXME: Use extensible data type. 
 
 data SourceError = SourceError SrcSpan ErrorMessage
   deriving (Eq, Show)
@@ -16,6 +17,7 @@ data ErrorMessage
   | ParseError
   | NotInScope Id
   | TypeMismatch String String
+  | MultiplePatVars [Id]
   deriving (Eq, Show)
 
 ------------------------------------------------------------------------
@@ -35,3 +37,6 @@ instance Pretty ErrorMessage where
         nest 4 (text t1) $$
         wrappingText "Against inferred type:" $$
         nest 4 (text t2)
+    MultiplePatVars vs ->
+        wrappingText "Multiple occurrences of pattern variables:" $$
+        nest 4 (fsep (commaSep (map ppr vs)))
