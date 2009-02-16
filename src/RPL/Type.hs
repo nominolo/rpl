@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances #-}
 module RPL.Type where
 
 import RPL.Names
@@ -58,21 +59,37 @@ mkForall vs c t = TsQual vs c t
 
 -- ** Type Construction
 
+-- | Type class to automatically lift arguments into types.
+--
+-- This class is used to allow writing a 'TyVar' where a 'Type' is expected.
+-- 
+class ToType a       where toType :: a -> Type
+instance ToType Type  where toType = id
+instance ToType TyVar where toType = TyVar
+
 typeFun :: Type
 typeFun = TyCon funTyCon 2
 
 funTyCon :: TyCon
 funTyCon = Id (uniqueFromInt 3) "->"
 
+infixr 6 .->.
+
+-- | Creates a function type.
+(.->.) :: (ToType l, ToType r) => l -> r -> Type
+l .->. r = TyApp (TyApp typeFun (toType l)) (toType r)
+
+-- | Puts arrows between the list of types.
+-- 
 --     x -> y -> z
 --     == ((->) x ((->) y z))
 --     == (((->) x) (((->) y) z))
 --
 --     x -> y == (((->) x) y)
-mkFun :: [Type] -> Type
+mkFun :: ToType t => [t] -> Type
 mkFun []     = error "mkFun: expects at least one argument"
-mkFun [t]    = t
-mkFun (t:ts) = TyApp (TyApp typeFun t) (mkFun ts)
+mkFun [t]    = toType t
+mkFun (t:ts) = TyApp (TyApp typeFun (toType t)) (mkFun ts)
 
 -- ** Free Variables
 
@@ -189,4 +206,4 @@ instance Arbitrary Type where
             [(1,gen_node)
             ,(5,do t1 <- resize (n `div` 2) arbitrary
                    t2 <- resize (n `div` 2) arbitrary
-                   return (mkFun [t1, t2]))]
+                   return (mkFun [t1 :: Type, t2]))]
