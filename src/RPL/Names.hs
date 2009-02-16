@@ -17,8 +17,12 @@ data Id = Id !Unique String
 idString :: Id -> String
 idString (Id _ n) = n
 
+isBuiltInName :: Id -> Bool
+isBuiltInName (Id u _) = intFromUnique u < 100
+
 instance Pretty Id where
-  ppr (Id u v) = text v <> ifDebugStyle (ppr u)
+  ppr n@(Id u v) =
+     text v <> ifDebugStyle (if isBuiltInName n then empty else ppr u)
 
 -- | For an arbitrary infix operator `<>` defines how an expression
 -- 

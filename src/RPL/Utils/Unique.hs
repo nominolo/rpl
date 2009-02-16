@@ -1,6 +1,6 @@
 module RPL.Utils.Unique (
   Unique,
-  uniqueFromInt,
+  uniqueFromInt, intFromUnique
 ) where
 
 import RPL.Utils.Pretty
@@ -15,6 +15,9 @@ instance Pretty Unique where
 
 uniqueFromInt :: Int -> Unique
 uniqueFromInt n = Unique n
+
+intFromUnique :: Unique -> Int
+intFromUnique (Unique n) = n
 
 baseXDigits :: UArray Int Char
 baseXDigits = listArray (0, n) digits
