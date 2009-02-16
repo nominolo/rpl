@@ -40,6 +40,12 @@ pprint x = putStrLn $ P.render $ ppr x UserStyle
 debugPrint :: Pretty a => a -> IO ()
 debugPrint x = putStrLn $ P.render $ ppr x DebugStyle
 
+render :: PDoc -> String
+render d = P.render (d UserStyle)
+
+debugRender :: PDoc -> String
+debugRender d = P.render (d DebugStyle)
+
 ------------------------------------------------------------------------
 -- * Combinators
 
