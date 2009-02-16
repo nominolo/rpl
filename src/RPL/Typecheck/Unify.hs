@@ -42,7 +42,7 @@ unifyTypes us0 = go emptyTySubst us0
 
 -- TODO: kind checking
 unify2 :: TySubst -> Type -> Type -> Either (Type, Type) TySubst
-unify2 subst t1 t2 | trace (pretty (subst, [t1, t2])) False = undefined 
+--unify2 subst t1 t2 | trace (pretty (subst, [t1, t2])) False = undefined 
 unify2 subst (TyVar x) t = uVar subst x t
 unify2 subst t (TyVar x) = uVar subst x t
 unify2 subst (TyCon c i) (TyCon c' i')
