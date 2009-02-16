@@ -1,5 +1,6 @@
 module RPL.Typecheck.Subst where
 
+import RPL.Typecheck.Monad
 import RPL.Names
 import RPL.Type
 
@@ -57,6 +58,43 @@ instance Pretty TySubst where
     where
       ppr_substs = fsep . punctuate comma .
                    map (\(v, t) -> ppr v <+> text ":=" <+> ppr t)
+
+-- | Given an Id and a substitution returns the fully expanded type.
+--
+-- TODO: avoid infinite recursion
+expandSubst :: Id -> TySubst -> Type
+expandSubst x0 s = go (TyVar x0)
+  where
+    go (TyVar x) =
+        case s ! x of
+          Nothing -> TyVar x
+          Just t' -> go t'
+    go c@(TyCon _ _) = c
+    go c@(TyApp t1 t2) = go t1 `TyApp` go t2
+
+-- | Normalise type to use only easily distinguishable type variables.
+--
+-- For example:
+--
+--     forall t34 t45 tn9. (t34 -> t45) -> tn9 -> t34
+--
+-- becomes
+--
+--     forall a b c. (a -> b) -> c -> a
+--
+cleanUpForUser :: Type -> Type
+cleanUpForUser ty = let Right (ty',_,_) = runTcM $ go ty M.empty simpleNames in ty'
+  where
+    go (TyVar x) m ns =
+       case M.lookup x m of
+         Just x'  -> return (TyVar x', m, ns)
+         Nothing -> do x' <- genId (head ns)
+                       return (TyVar x', M.insert x x' m, tail ns)
+    go c@(TyCon _ _) m ns = return (c, m, ns)
+    go (TyApp t1 t2) m ns = do
+        (t1', m', ns') <- go t1 m ns
+        (t2', m'', ns'') <- go t2 m' ns'
+        return (TyApp t1' t2', m'', ns'')
 
 ------------------------------------------------------------------------
 
