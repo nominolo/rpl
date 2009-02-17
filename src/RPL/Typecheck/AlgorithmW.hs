@@ -16,6 +16,7 @@ import Data.Map ( Map )
 import Data.Set ( Set )
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.List ( foldl' )
 
 import Debug.Trace
 
@@ -31,9 +32,12 @@ import Debug.Trace
 --     generalise {x} ((x -> y -> Int) -> z -> y)
 --       == forall y z . (x -> y -> Int) -> z -> y
 --
-generalise :: Set Id -> Type -> TypeScheme
-generalise monos t =
-  mkForall (S.toList (ftv t `S.difference` monos)) CTrue t
+generalise :: TypeEnv -> Type -> TypeScheme
+generalise env t =
+   mkForall (S.toList (ftv t `S.difference` monos)) CTrue t
+  where
+    -- free type vars in the type schemes of env
+    monos = foldl' S.union S.empty (map tsFTV (envElems env))
 
 -- | Infer the type of an expression in the top-level environment.
 --
@@ -41,7 +45,7 @@ toplevelInfer :: Expr -> TcM (TySubst, Type)
 toplevelInfer e = infer emptyEnv e
 
 
-type TypeEnv = Env TypeScheme
+type TypeEnv = Env Id TypeScheme
 
 -- | Infer the type of an expression using Algorithm W.
 --
@@ -55,20 +59,20 @@ infer env (EVar loc var) =
       Nothing -> throwError (SourceError loc (NotInScope var))
       Just s -> do
         let as = tsVars s
-        bs <- mapM (genId . idString) as
+        bs <- mapM (freshTyVar . idString . tvId) as
         return (emptyTySubst,
                 apply (emptyTySubst // [ (a, TyVar b) | (a,b) <- zip as bs ])
                       (tsType s))
 
 infer env (ELam _ (VarPat _ x) e) = do
-    b <- genId (idString x)
+    b <- freshTyVar (idString x)
     (s, t) <- infer (extendEnv env x (mkForall [] CTrue (TyVar b))) e
     return (s, apply s (mkFun [TyVar b, t]))
 
 infer env (EApp loc e1 e2) = do
     (s1, t1) <- infer env e1
     (s2, t2) <- infer (apply s1 env) e2
-    b <- genId "t"
+    b <- freshTyVar "t"
     case unify (apply s2 t1) (mkFun [t2, TyVar b]) of
       Left (t, t') -> throwError (SourceError loc (TypeMismatch (pretty t) (pretty t')))
       Right s3 ->
@@ -77,6 +81,6 @@ infer env (EApp loc e1 e2) = do
 
 infer env (ELet _ (VarPat _ x) e1 e2) = do
     (s1, t1) <- infer env e1
-    let scheme = generalise (envDomain (apply s1 env)) t1
+    let scheme = generalise (apply s1 env) t1
     (s2, t2) <- infer (extendEnv (apply s1 env) x scheme) e2
     return (s2 `composeTySubst` s1, t2)

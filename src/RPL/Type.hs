@@ -14,14 +14,17 @@ import Test.QuickCheck
 ------------------------------------------------------------------------
 
 data Type
-  = TyVar Id
+  = TyVar TyVar
   | TyCon TyCon Int
   | TyApp Type Type
   deriving (Eq, Ord, Show)
 
 type TyCon = Id  -- for now
 type Term = Type
-type TyVar = Id
+newtype TyVar = TV { tvId :: Id } deriving (Eq, Ord, Show)
+
+mkTyVar :: Id -> TyVar
+mkTyVar = TV
 
 data Constraint
   = CTrue
@@ -35,10 +38,10 @@ data Constraint
 
 data TypeScheme
   = TsType Type
-  | TsQual [Id] Constraint Type
+  | TsQual [TyVar] Constraint Type
   deriving (Eq, Show)
 
-tsVars :: TypeScheme -> [Id]
+tsVars :: TypeScheme -> [TyVar]
 tsVars (TsType _) = []
 tsVars (TsQual vs _ _) = vs
 
@@ -50,7 +53,7 @@ tsType :: TypeScheme -> Type
 tsType (TsType t) = t
 tsType (TsQual _ _ t) = t
 
-mkForall :: [Id] -> Constraint -> Type -> TypeScheme
+mkForall :: [TyVar] -> Constraint -> Type -> TypeScheme
 mkForall [] CTrue t = TsType t
 mkForall vs c t = TsQual vs c t
 
@@ -94,13 +97,13 @@ mkFun (t:ts) = TyApp (TyApp typeFun (toType t)) (mkFun ts)
 -- ** Free Variables
 
 -- | Free Type Variables.
-ftv :: Type -> Set Id
+ftv :: Type -> Set TyVar
 ftv (TyVar v)     = S.singleton v
 ftv (TyCon _ ts)  = S.empty
 ftv (TyApp t1 t2) = S.union (ftv t1) (ftv t2)
 
 -- | Free Type Variables of a type scheme.
-tsFTV :: TypeScheme -> Set Id
+tsFTV :: TypeScheme -> Set TyVar
 tsFTV (TsType t)      = ftv t
 tsFTV (TsQual vs _ t) = ftv t `S.difference` S.fromList vs
 
@@ -122,6 +125,9 @@ mkExists vars c = foldr CExists c vars
 
 ------------------------------------------------------------------------
 -- * Pretty Printing
+
+instance Pretty TyVar where
+  ppr (TV x) = ppr x
 
 instance Pretty Type where
   ppr typ = ppr_type typ
@@ -198,7 +204,7 @@ instance Arbitrary Type where
     where
       gen_node =
           frequency
-            [(2, TyVar `fmap` arbitrary)
+            [(2, TyVar `fmap` TV `fmap` arbitrary)
             ,(1, do (Uppercase n) <- arbitrary
                     return (TyCon n 0))]
       gen_node_or_leaf n =

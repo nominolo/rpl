@@ -1,5 +1,6 @@
 module RPL.Typecheck.Monad (
   TcM, runTcM, genId, throwError,
+  freshTyVar,
 ) where
 
 import RPL.Names
@@ -28,3 +29,6 @@ genId disp_name =
                         M.update (Just . (1+)) disp_name m)
        i' `seq` m' `seq` setState (i', m')
        return $ Id (uniqueFromInt i) n
+
+freshTyVar :: String -> TcM TyVar
+freshTyVar = (mkTyVar `fmap`) . genId

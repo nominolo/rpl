@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module RPL.Typecheck.Subst where
 
 import RPL.Typecheck.Monad
@@ -15,7 +16,7 @@ import Data.List ( foldl' )
 
 ------------------------------------------------------------------------
 
-newtype TySubst = TySubst (Map Id Type)
+newtype TySubst = TySubst (Map TyVar Type)
 
 class HasTySubst a where
   apply :: TySubst -> a -> a
@@ -33,19 +34,19 @@ composeTySubst s1@(TySubst m1) s2@(TySubst m2) =
    TySubst (m1 `M.union` M.map (apply s1) m2)
 
 -- | Extend substitution.  Overwrites existing mappings.
-(//) :: TySubst -> [(Id, Type)] -> TySubst
+(//) :: TySubst -> [(TyVar, Type)] -> TySubst
 (TySubst s) // ab's = TySubst (M.union (M.fromList ab's) s)
 
-(|->) :: Id -> Type -> TySubst
+(|->) :: TyVar -> Type -> TySubst
 x |-> a = TySubst (M.singleton x a)
 
-(!) :: TySubst -> Id -> Maybe Type
+(!) :: TySubst -> TyVar -> Maybe Type
 (TySubst m) ! x = M.lookup x m
 
-addTySubstBinding :: TySubst -> Id -> Type -> TySubst
+addTySubstBinding :: TySubst -> TyVar -> Type -> TySubst
 addTySubstBinding (TySubst m) x t = TySubst (M.insert x t m)
 
-delTySubst :: TySubst -> Id -> TySubst
+delTySubst :: TySubst -> TyVar -> TySubst
 delTySubst (TySubst m) x = TySubst (M.delete x m)
 
 instance Monoid TySubst where
@@ -62,7 +63,7 @@ instance Pretty TySubst where
 -- | Given an Id and a substitution returns the fully expanded type.
 --
 -- TODO: avoid infinite recursion
-expandSubst :: Id -> TySubst -> Type
+expandSubst :: TyVar -> TySubst -> Type
 expandSubst x0 s = go (TyVar x0)
   where
     go (TyVar x) =
@@ -83,12 +84,13 @@ expandSubst x0 s = go (TyVar x0)
 --     forall a b c. (a -> b) -> c -> a
 --
 cleanUpForUser :: Type -> Type
-cleanUpForUser ty = let Right (ty',_,_) = runTcM $ go ty M.empty simpleNames in ty'
+cleanUpForUser ty = 
+    let Right (ty',_,_) = runTcM $ go ty M.empty simpleNames in ty'
   where
     go (TyVar x) m ns =
        case M.lookup x m of
          Just x'  -> return (TyVar x', m, ns)
-         Nothing -> do x' <- genId (head ns)
+         Nothing -> do x' <- freshTyVar (head ns)
                        return (TyVar x', M.insert x x' m, tail ns)
     go c@(TyCon _ _) m ns = return (c, m, ns)
     go (TyApp t1 t2) m ns = do
@@ -113,24 +115,27 @@ instance HasTySubst TypeScheme where
 
 ------------------------------------------------------------------------
 
-newtype Env t = Env (Map Id t)
+newtype Env i t = Env (Map i t)
 
-emptyEnv :: Env t
+emptyEnv :: Env i t
 emptyEnv = Env M.empty
 
-singletonEnv :: Id -> t -> Env t
+singletonEnv :: Ord i => i -> t -> Env i t
 singletonEnv x t = Env (M.singleton x t)
 
-lookupEnv :: Env t -> Id -> Maybe t
+lookupEnv :: Ord i =>  Env i t -> i -> Maybe t
 lookupEnv (Env m) x = M.lookup x m
 
-extendEnv :: Env t -> Id -> t -> Env t
+extendEnv :: Ord i => Env i t -> i -> t -> Env i t
 extendEnv (Env m) x ts = Env (M.insert x ts m)
 
-envDomain :: Env t -> Set Id
+envDomain :: Ord i => Env i t -> Set i
 envDomain (Env m) = M.keysSet m
 
-instance HasTySubst t => HasTySubst (Env t) where
+envElems :: Env i t -> [t]
+envElems (Env m) = M.elems m
+
+instance HasTySubst t => HasTySubst (Env i t) where
   apply s (Env m) = Env (M.map (apply s) m)
 
 ------------------------------------------------------------------------
