@@ -6,4 +6,4 @@ Setup.exe*
 Setup
 TAGS
 config.mk
-
+.dist-scion/
