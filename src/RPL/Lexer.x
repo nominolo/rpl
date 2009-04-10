@@ -160,7 +160,7 @@ parseFail = do
     s <- getState
     parseMError (lex_last_loc s) ParseError
 
--- The token type:
+-- | The token type
 data Token 
   = TokLet
   | TokIn
