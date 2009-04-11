@@ -174,3 +174,6 @@ data Located e
         unLoc  :: e        -- ^ Extract wrapped element.
       }
   deriving (Show, Eq)
+
+instance Pretty e => Pretty (Located e) where
+  ppr (L l e) = sep [char '{' <> ppr l <> char '}', ppr e]

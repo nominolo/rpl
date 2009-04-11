@@ -8,6 +8,7 @@ module RPL.Lexer where
 
 import RPL.Utils.Monads
 import RPL.Utils.SrcLoc
+import RPL.Utils.Pretty
 import RPL.Error
 
 import qualified Data.ByteString.Lazy.Char8 as BS
@@ -186,6 +187,9 @@ data Token
   | TokInt Int
   | TokEof
   deriving (Eq,Show)
+
+instance Pretty Token where
+  ppr t = text (show t) -- TODO
 
 main = do
   s <- BS.getContents
