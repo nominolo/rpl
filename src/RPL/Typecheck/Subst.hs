@@ -18,6 +18,9 @@ import Data.List ( foldl' )
 
 newtype TySubst = TySubst (Map TyVar Type)
 
+instance Show TySubst where
+  showsPrec _ (TySubst m) = showString "TySubst" . showsPrec 11 m
+
 class HasTySubst a where
   apply :: TySubst -> a -> a
 
