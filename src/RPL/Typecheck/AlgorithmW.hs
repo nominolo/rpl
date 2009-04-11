@@ -1,4 +1,7 @@
-module RPL.Typecheck.AlgorithmW where
+module RPL.Typecheck.AlgorithmW
+  ( module RPL.Typecheck.AlgorithmW
+  , runTcM
+  ) where
 
 import Prelude hiding ( (!!) )
 

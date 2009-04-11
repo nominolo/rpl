@@ -1,5 +1,9 @@
 {-# LANGUAGE BangPatterns, PatternGuards #-}
-module RPL.Typecheck.InferHMX (
+module RPL.Typecheck.InferHMX () where
+
+{------
+ BITROTTED
+
   module RPL.Typecheck.InferHMX,
   runTcM,
 ) where
@@ -119,3 +123,4 @@ normTerm s t@(TyVar v)
   | Just v' <- lookup v s = TyVar v'
   | otherwise             = t
 normTerm s (TyApp t1 t2)  = TyApp (normTerm s t1) (normTerm s t2)
+--}
