@@ -116,6 +116,17 @@ instance HasTySubst TypeScheme where
   apply s (TsQual vs c t) =
       TsQual vs c (apply (foldl' delTySubst s vs) t)
 
+-- | Instantiate a type scheme to a monotype.  The substitution must be
+-- defined for every forall-quantified variable of the type scheme.  The
+-- result may contain skolems.
+instantiate :: TypeScheme -> TySubst -> Maybe Type
+instantiate (TsType t) _ = Just t
+instantiate (TsQual vs c t) s@(TySubst m) =
+    checkDomain vs >> return (apply s t)
+  where checkDomain [] = Just ()
+        checkDomain (v:vs') | v `M.member` m = checkDomain vs'
+                            | otherwise      = Nothing
+
 ------------------------------------------------------------------------
 
 newtype Env i t = Env (Map i t)
