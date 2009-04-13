@@ -37,7 +37,7 @@ import Debug.Trace
 --
 generalise :: TypeEnv -> Type -> TypeScheme
 generalise env t =
-   mkForall (S.toList (ftv t `S.difference` monos)) CTrue t
+   mkForall (S.toList (ftv t `S.difference` monos)) [] t
   where
     -- free type vars in the type schemes of env
     monos = foldl' S.union S.empty (map tsFTV (envElems env))
@@ -62,14 +62,14 @@ infer env (EVar loc var) =
       Nothing -> throwError (SourceError loc (NotInScope var))
       Just s -> do
         let as = tsVars s
-        bs <- mapM (freshTyVar . idString . tvId) as
+        bs <- mapM (freshTyVar . idString . tyVarId) as
         return (emptyTySubst,
                 apply (emptyTySubst // [ (a, TyVar b) | (a,b) <- zip as bs ])
                       (tsType s))
 
 infer env (ELam _ (VarPat _ x) e) = do
     b <- freshTyVar (idString x)
-    (s, t) <- infer (extendEnv env x (mkForall [] CTrue (TyVar b))) e
+    (s, t) <- infer (extendEnv env x (mkForall [] [] (TyVar b))) e
     return (s, apply s (mkFun [TyVar b, t]))
 
 infer env (EApp loc e1 e2) = do

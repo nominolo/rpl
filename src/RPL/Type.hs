@@ -12,6 +12,7 @@ import qualified Data.Set as S
 import Test.QuickCheck
 
 ------------------------------------------------------------------------
+-- * The Type of Types
 
 data Type
   = TyVar TyVar
@@ -21,41 +22,35 @@ data Type
 
 type TyCon = Id  -- for now
 type Term = Type
-newtype TyVar = TV { tvId :: Id } deriving (Eq, Ord, Show)
+newtype TyVar = TV { tyVarId :: Id } deriving (Eq, Ord, Show)
 
 mkTyVar :: Id -> TyVar
 mkTyVar = TV
 
 data Constraint
-  = CTrue
-  | CEquals Term Term
-  | CAnd Constraint Constraint
-  | CExists Id Constraint
+  = CEquals Term Term
   deriving (Eq, Show)
 
 ------------------------------------------------------------------------
 -- * Type Scheme
 
 data TypeScheme
-  = TsType Type
-  | TsQual [TyVar] Constraint Type
+  = ForAll [TyVar] Constraints Type
   deriving (Eq, Show)
 
-tsVars :: TypeScheme -> [TyVar]
-tsVars (TsType _) = []
-tsVars (TsQual vs _ _) = vs
+type Constraints = [Constraint]
 
-tsConstaint :: TypeScheme -> Constraint
-tsConstaint (TsType _) = CTrue
-tsConstaint (TsQual _ c _) = c
+tsVars :: TypeScheme -> [TyVar]
+tsVars (ForAll vs _ _) = vs
+
+tsConstaints :: TypeScheme -> Constraints
+tsConstaints (ForAll _ c _) = c
 
 tsType :: TypeScheme -> Type
-tsType (TsType t) = t
-tsType (TsQual _ _ t) = t
+tsType (ForAll _ _ t) = t
 
-mkForall :: [TyVar] -> Constraint -> Type -> TypeScheme
-mkForall [] CTrue t = TsType t
-mkForall vs c t = TsQual vs c t
+mkForall :: [TyVar] -> Constraints -> Type -> TypeScheme
+mkForall vs c t = ForAll vs c t
 
 ------------------------------------------------------------------------
 -- * Helpers
@@ -104,8 +99,7 @@ ftv (TyApp t1 t2) = S.union (ftv t1) (ftv t2)
 
 -- | Free Type Variables of a type scheme.
 tsFTV :: TypeScheme -> Set TyVar
-tsFTV (TsType t)      = ftv t
-tsFTV (TsQual vs _ t) = ftv t `S.difference` S.fromList vs
+tsFTV (ForAll vs _ t) = ftv t `S.difference` S.fromList vs
 
 -- ** Constraint Construction
 
@@ -115,13 +109,10 @@ infix 4 ===
 (===) :: Term -> Term -> Constraint
 t1 === t2 = CEquals t1 t2
 
-(/\) :: Constraint -> Constraint -> Constraint
-CTrue /\ c = c
-c /\ CTrue = c
-c1 /\ c2 = CAnd c1 c2
-
-mkExists :: [Id] -> Constraint -> Constraint
-mkExists vars c = foldr CExists c vars
+(/\) :: Constraints -> Constraints -> Constraints
+[] /\ c = c
+c /\ [] = c
+c1 /\ c2 = c1 ++ c2
 
 ------------------------------------------------------------------------
 -- * Pretty Printing
@@ -170,29 +161,22 @@ infixTyConAssoc _ = error "unknown associativity"
 instance Pretty TypeScheme where
   ppr ts = ppr_type_scheme ts
 
-ppr_type_scheme (TsType t) = ppr t
-ppr_type_scheme (TsQual vs cs t) =
+ppr_type_scheme :: TypeScheme -> PDoc
+ppr_type_scheme (ForAll [] [] t) = ppr t
+ppr_type_scheme (ForAll vs cs t) =
     sep [foralls, constraints, ppr t]
   where
     foralls = case vs of
                 [] -> empty
                 _ -> text "forall" <+> sep (map ppr vs) <+> char '.'
     constraints = case cs of
-                    CTrue -> empty
-                    _ -> ppr cs <+> text "=>"
+                    [] -> empty
+                    _ -> parens (fsep (map ppr cs)) <+> text "=>"
 
 instance Pretty Constraint where
   ppr = ppr_constraint
 
-ppr_constraint CTrue = text "True"
 ppr_constraint (CEquals t1 t2) = ppr t1 <+> text "=" <+> ppr t2
-ppr_constraint (CAnd c1 c2) = sep [ppr c1 <> comma, ppr c2]
-ppr_constraint (CExists v c) = ppr_exists c [v]
-
-ppr_exists (CExists v c) vs = ppr_exists c (v:vs)
-ppr_exists c vs = 
-    parens $ hang (text "exists" <+> sep (map ppr (reverse vs)) <+> char '.')
-               2 (ppr c)
 
 ------------------------------------------------------------------------
 -- * Testing
