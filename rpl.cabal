@@ -33,6 +33,7 @@ Library
                               RPL.Typecheck.AlgorithmW
                               RPL.Typecheck.InferHMX
                               RPL.Utils.Monads
+                              RPL.Utils.Panic
                               RPL.Utils.Pretty
                               RPL.Utils.SrcLoc
                               RPL.Utils.Unique

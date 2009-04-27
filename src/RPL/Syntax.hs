@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternGuards #-}
+{-# OPTIONS_GHC #-}
 -- |
 -- Module      : RPL.Syntax
 -- Copyright   : (c) Thomas Schilling 2009
@@ -15,6 +17,7 @@ module RPL.Syntax (
 import RPL.Names
 import RPL.Utils.Pretty
 import RPL.Utils.SrcLoc
+import RPL.Utils.Panic
 
 ------------------------------------------------------------------------
 -- * Datatypes
@@ -44,7 +47,7 @@ exprSpan exp = case exp of
 
 -- | Construct an expression from a lambda with multiple arguments.
 --
---     \ x_1 ... x_n -> E   ~~>   \ x_1 -> \x_2 -> ... \x_n -> E
+-- > \ x_1 ... x_n -> E   ~~>   \ x_1 -> \x_2 -> ... \x_n -> E
 --
 mkLam :: SrcSpan -- ^ Location of the "\"
       -> [Pat] -> Expr -> Expr  
@@ -55,16 +58,45 @@ mkLam loc (p:ps) exp = ELam (loc `combineSpans` l') p (go ps)
     go (p:ps) = ELam (patSpan p `combineSpans` l') p (go ps)
     l' = exprSpan exp
 
+-- | Construct nested applications from an n-ary application. I.e., 
+--
+-- > mkApp f [x,y,z] = (((f x) y) z)
+--
+mkApp :: Expr -> [Expr] -> Expr
+mkApp fun [] = fun
+mkApp fun (e:es) =
+    let e' = EApp (exprSpan fun `combineSpans` exprSpan e) fun e in
+    e' `seq` mkApp e' es
+
 type Program = Expr
 
 -- | A pattern.
 data Pat
-  = VarPat SrcSpan Id
+  = VarPat SrcSpan Id -- ^ Single variable pattern.
   deriving (Show)
 
+-- | Return source span of a pattern.
 patSpan :: Pat -> SrcSpan
 patSpan pat = case pat of
   VarPat s _ -> s
+
+------------------------------------------------------------------------
+-- * Views
+
+-- | View nested unary applications as n-ary applications.  I.e.,
+--
+-- > viewApp (((f x) y) z) = (f, [x,y,z])
+--
+-- Inverse of 'mkApp'.
+viewApp :: Expr -> (Expr, [Expr])
+viewApp (EApp _ e1 e2) = go e1 [e2]
+  where
+    go (EApp _ e1 e2) args = go e1 (e2 : args)
+    go fun_expr       args = (fun_expr, args)
+viewApp exp = panic $
+    text "viemMultiApp can only be applied to expressions of the form (EApp ...)"
+     $+$
+    text "Input was:" <+> text (show exp)
 
 ------------------------------------------------------------------------
 -- * Pretty Instances
@@ -78,22 +110,35 @@ instance Pretty Expr where
     ELit _ l -> ppr l
     EVar _ v -> ppr v
     ELam _ p e -> ppr_lam e [p]
-    EApp _ e1 e2 -> ppr_app e1 [e2]
+    EApp _ _ _ -> ppr_app exp
     ELet _ v e1 e2 -> 
         keyword "let" <+> ppr v <+> char '=' <+> ppr e1 <+> keyword "in" $$
         ppr e2
 
-ppr_lam (ELam _ p e) ps = ppr_lam e (p:ps)
-ppr_lam e ps =
-    parens $ hang (char '\\' <> sep (map ppr (reverse ps)) <+> text "->") 2 (ppr e)
+-- Combine nested lambdas into one top-level lambda.  I.e.,
+--
+-- > \x -> \y -> foo
+--
+-- is printed as
+--
+-- > \x y -> foo
+--
+-- TODO: don't do this if we have shadowed bindings (i.e. @\x -> \x -> ...@)
+ppr_lam inner_expr outer_pats =
+  case inner_expr of
+    ELam _ pat e -> ppr_lam e (pat : outer_pats)
+    _otherwise -> 
+      parens $ hang (char '\\' <> sep (map ppr (reverse outer_pats))
+                              <+> text "->")
+                    2 (ppr inner_expr)
 
 -- | Only print outermost parens for nested applications. I. e.,
 --
---     (((f x) y) z)   ~~>   (f x y z)
+-- > (((f x) y) z)   ~~>   (f x y z)
 -- 
-ppr_app :: Expr -> [Expr] -> PDoc
-ppr_app (EApp _ e1 e2) es = ppr_app e1 (e2 : es)
-ppr_app f es            = parens (ppr f <+> sep (map ppr es))
+ppr_app :: Expr -> PDoc
+ppr_app exp | (f, es) <- viewApp exp = parens (ppr f <+> sep (map ppr es))
+
 
 instance Pretty Pat where
   ppr pat = case pat of
