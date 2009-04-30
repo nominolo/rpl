@@ -9,7 +9,9 @@ import RPL.Utils.Pretty
 ------------------------------------------------------------------------
 -- FIXME: Use extensible data type. 
 
-data SourceError = SourceError SrcSpan ErrorMessage
+data SourceError
+  = SourceError { errSpan :: SrcSpan
+                , errMsg  :: ErrorMessage }
   deriving (Eq, Show)
 
 data ErrorMessage
