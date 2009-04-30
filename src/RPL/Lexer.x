@@ -3,6 +3,7 @@
 {
 {-# OPTIONS_GHC -w #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# LANGUAGE BangPatterns #-}
 
 module RPL.Lexer where
 
@@ -60,17 +61,23 @@ parseMError span err = throwError (SourceError span err)
 
 -- ** The Lexer State
 
-data LexState = LexState {
-        lex_pos  :: !SrcLoc,  -- position at current input location
-        lex_inp  :: UTF8.ByteString, -- the current input
-        lex_offs :: {-#UNPACK#-} !Int64,
-          -- ^ byte offset since the start of buffer
-        lex_chr  :: {-#UNPACK#-} !Char,  -- the character before the input
-        lex_scd  :: {-#UNPACK#-} !Int,   -- the current startcode
-        lex_last_loc :: SrcSpan
-          -- ^ Location of last token.  Used for reporting parse errors.
-    }
+data LexState = LexState
+  { lex_pos  :: !SrcLoc
+    -- ^ Position at current input location.
+  , lex_inp  :: UTF8.ByteString
+    -- ^ The current input.
+  , lex_offs :: {-#UNPACK#-} !Int64
+    -- ^ Byte offset since the start of buffer.  Stored in the 'SrcLoc'.
+  , lex_chr  :: {-#UNPACK#-} !Char
+    -- ^ the character before the input (the look-ahead)
+  , lex_scd  :: {-#UNPACK#-} !Int
+    -- ^ The current start code (i.e., lexer state).
+  , lex_last_loc :: SrcSpan
+    -- ^ Location of last token.  Used for reporting parse errors.
+  }
 
+-- | Set the location of the last token.  This is used as the position in
+-- case of a parse error.
 setLastLoc :: SrcSpan -> ParseM ()
 setLastLoc span = modifyState $ \s -> s { lex_last_loc = span }
 
@@ -90,10 +97,10 @@ alexGetChar (AI p o _ bs) =
   case UTF8.decode bs of
     Nothing -> Nothing
     Just (c, len) ->
-        let bs' = UTF8.drop len bs
-            p'  = advanceSrcLoc p c
-            o'  = o + len
-        in p' `seq` bs' `seq` o `seq` Just (c, AI p' o' c bs')
+        let !bs' = UTF8.drop len bs
+            !p'  = advanceSrcLoc p c
+            !o'  = o + len
+        in Just (c, AI p' o' c bs')
 
 -- * Our utils
 
@@ -103,9 +110,7 @@ getInput = do s <- getState
 
 setInput :: AlexInput -> ParseM ()
 setInput (AI p o c bs) = do
-    s <- getState
-    let s' = s { lex_pos = p, lex_chr = c, lex_inp = bs, lex_offs = o }
-    setState s'
+    modifyState (\s -> s { lex_pos = p, lex_chr = c, lex_inp = bs, lex_offs = o })
                        
 getLexState :: ParseM Int
 getLexState = gets lex_scd
@@ -128,11 +133,10 @@ lexToken = do
       lexToken
     AlexToken inp2@(AI loc2 offs2 _ bs') _ t -> do
       setInput inp2
-      let span = mkSrcSpan loc1 loc2
+      let !span = mkSrcSpan loc1 loc2
       let bytes = offs2 - offs1
-      span `seq` setLastLoc span
+      setLastLoc span
       t span (UTF8.toString (UTF8.take bytes bs))
-      
 
 lexer :: (Located Token -> ParseM a) -> ParseM a
 lexer cont = do
@@ -147,7 +151,7 @@ runParseM m buf loc = unSSEM m (\_ -> Right) Left initState
   where
     initState = LexState loc buf 0 '\n' 0 noSrcSpan
 
--- TODO: This may be too strict, if the result type were
+-- | TODO: This may be too strict, if the result type were
 --
 --     (Maybe SourcError, [Located Token])
 --
@@ -155,12 +159,13 @@ runParseM m buf loc = unSSEM m (\_ -> Right) Left initState
 lexTokenStream :: UTF8.ByteString -> SrcLoc 
                -> Either SourceError [Located Token]
 lexTokenStream buf loc = unSSEM go (\_ -> Right) Left initState
-    where initState = LexState loc buf 0 '\n' 0 noSrcSpan
-          go = do
-            ltok <- lexer return
-            case ltok of
-              L _ TokEof -> return []
-              _ -> liftM (ltok:) go
+  where
+    initState = LexState loc buf 0 '\n' 0 noSrcSpan
+    go = do
+      ltok <- lexer return
+      case ltok of
+        L _ TokEof -> return []
+        _ -> liftM (ltok:) go
 
 parseFail :: ParseM a
 parseFail = do
