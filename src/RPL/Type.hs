@@ -78,12 +78,16 @@ infixr 6 .->.
 l .->. r = TyApp (TyApp typeFun (toType l)) (toType r)
 
 -- | Puts arrows between the list of types.
--- 
+--
+-- @
 --     x -> y -> z
 --     == ((->) x ((->) y z))
 --     == (((->) x) (((->) y) z))
---
+-- 
 --     x -> y == (((->) x) y)
+-- @
+--
+-- Input list must be non-empty.
 mkFun :: ToType t => [t] -> Type
 mkFun []     = error "mkFun: expects at least one argument"
 mkFun [t]    = toType t
