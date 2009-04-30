@@ -1,5 +1,17 @@
 {-# LANGUAGE TypeSynonymInstances #-}
-module RPL.Type where
+module RPL.Type 
+  ( -- * Types
+    Type(..), Term, (.->.), mkFun, ftv
+  , -- * Type Constructors
+    TyCon, isInfixTyCon
+    -- * Type Variables
+  , TyVar, tyVarId, mkTyVar
+    -- * Constraints
+  , Constraint, Constraints, (===), (/\)
+    -- * Type Schemes
+  , TypeScheme(..), tsVars, tsConstraints, tsType, mkForall, tsFTV
+  )
+where
 
 import RPL.Names
 import RPL.Utils.Pretty
@@ -14,6 +26,7 @@ import Test.QuickCheck
 ------------------------------------------------------------------------
 -- * The Type of Types
 
+-- | The Type of Types
 data Type
   = TyVar TyVar
   | TyCon TyCon Int
@@ -43,8 +56,8 @@ type Constraints = [Constraint]
 tsVars :: TypeScheme -> [TyVar]
 tsVars (ForAll vs _ _) = vs
 
-tsConstaints :: TypeScheme -> Constraints
-tsConstaints (ForAll _ c _) = c
+tsConstraints :: TypeScheme -> Constraints
+tsConstraints (ForAll _ c _) = c
 
 tsType :: TypeScheme -> Type
 tsType (ForAll _ _ t) = t
@@ -98,7 +111,7 @@ mkFun (t:ts) = TyApp (TyApp typeFun (toType t)) (mkFun ts)
 -- | Free Type Variables.
 ftv :: Type -> Set TyVar
 ftv (TyVar v)     = S.singleton v
-ftv (TyCon _ ts)  = S.empty
+ftv (TyCon _ _ts)  = S.empty
 ftv (TyApp t1 t2) = S.union (ftv t1) (ftv t2)
 
 -- | Free Type Variables of a type scheme.
@@ -127,13 +140,16 @@ instance Pretty TyVar where
 instance Pretty Type where
   ppr typ = ppr_type typ
 
+ppr_type :: Type -> PDoc
 ppr_type t = ppr_type' 0 t
 
+ppr_parens :: Bool -> PDoc -> PDoc
 ppr_parens True d = parens d
 ppr_parens False d = d
 
-ppr_type' d (TyVar v) = ppr v
-ppr_type' d (TyCon c _) = ppr c
+ppr_type' :: Int -> Type -> PDoc
+ppr_type' _ (TyVar v) = ppr v
+ppr_type' _ (TyCon c _) = ppr c
 ppr_type' d (TyApp (TyApp (TyCon c _) t) t')
   | isInfixTyCon c =
       let prec = infixTyConPrecedence c
@@ -180,6 +196,7 @@ ppr_type_scheme (ForAll vs cs t) =
 instance Pretty Constraint where
   ppr = ppr_constraint
 
+ppr_constraint :: Constraint -> PDoc
 ppr_constraint (CEquals t1 t2) = ppr t1 <+> text "=" <+> ppr t2
 
 ------------------------------------------------------------------------

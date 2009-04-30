@@ -15,13 +15,8 @@ import RPL.Utils.Pretty
 import RPL.BuiltIn
 import RPL.Error
 
-import Data.Map ( Map )
-import Data.Set ( Set )
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.List ( foldl' )
-
-import Debug.Trace
 
 ------------------------------------------------------------------------
 
@@ -53,7 +48,7 @@ type TypeEnv = Env Id TypeScheme
 -- | Infer the type of an expression using Algorithm W.
 --
 infer :: TypeEnv -> Expr -> TcM (TySubst, Type)
-infer env (ELit _ l) =
+infer _env (ELit _ l) =
     return (emptyTySubst, case l of
                             IntLit _ -> typeInt
                             CharLit _ -> typeChar)

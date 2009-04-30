@@ -33,7 +33,7 @@ emptyTySubst = TySubst M.empty
 --     apply (s1 `composeTySubst` s2) x == apply s1 (apply s2 x)
 --
 composeTySubst :: TySubst -> TySubst -> TySubst
-composeTySubst s1@(TySubst m1) s2@(TySubst m2) =
+composeTySubst s1@(TySubst m1) (TySubst m2) =
    TySubst (m1 `M.union` M.map (apply s1) m2)
 
 -- | Extend substitution.  Overwrites existing mappings.
@@ -74,7 +74,7 @@ expandSubst x0 s = go (TyVar x0)
           Nothing -> TyVar x
           Just t' -> go t'
     go c@(TyCon _ _) = c
-    go c@(TyApp t1 t2) = go t1 `TyApp` go t2
+    go (TyApp t1 t2) = go t1 `TyApp` go t2
 
 -- | Normalise type to use only easily distinguishable type variables.
 --
@@ -108,7 +108,7 @@ instance HasTySubst Type where
     case s ! i of
       Just t' -> t'
       Nothing -> t
-  apply s t@(TyCon _ _) = t
+  apply _s t@(TyCon _ _) = t
   apply s (TyApp t1 t2) = TyApp (apply s t1) (apply s t2)
 
 instance HasTySubst TypeScheme where
@@ -119,7 +119,7 @@ instance HasTySubst TypeScheme where
 -- defined for every forall-quantified variable of the type scheme.  The
 -- result may contain skolems.
 instantiate :: TypeScheme -> TySubst -> Maybe Type
-instantiate (ForAll vs c t) s@(TySubst m) =
+instantiate (ForAll vs _c t) s@(TySubst m) =
     checkDomain vs >> return (apply s t)
   where checkDomain [] = Just ()
         checkDomain (v:vs') | v `M.member` m = checkDomain vs'
@@ -152,5 +152,7 @@ instance HasTySubst t => HasTySubst (Env i t) where
 
 ------------------------------------------------------------------------
 
+prop_composeTySubst :: (HasTySubst a, Eq a) =>
+                       TySubst -> TySubst -> a -> Bool
 prop_composeTySubst s1 s2 x =
    apply (s1 `composeTySubst` s2) x == apply s1 (apply s2 x)

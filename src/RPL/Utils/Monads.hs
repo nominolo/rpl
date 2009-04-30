@@ -25,7 +25,7 @@ instance Applicative (StrictStateErrorM s e) where
 
 runStrictStateErrorM :: StrictStateErrorM s e a -> s -> Either e a
 runStrictStateErrorM m s0 =
-  unSSEM m (\s a -> Right a) Left s0
+  unSSEM m (\_s a -> Right a) Left s0
 
 getState :: StrictStateErrorM s e s
 getState = SSEM $ \k _ s -> k s s

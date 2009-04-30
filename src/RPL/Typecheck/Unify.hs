@@ -3,8 +3,6 @@ module RPL.Typecheck.Unify where
 
 import RPL.Typecheck.Subst
 import RPL.Type
-import Debug.Trace
-import RPL.Utils.Pretty
 
 ------------------------------------------------------------------------
 
@@ -58,6 +56,7 @@ uVar subst x t | Just t' <- subst ! x =
    unify2 subst t' t
 uVar subst x t = uUnrefined subst x t
 
+uUnrefined :: TySubst -> TyVar -> Type -> Either (Type, Type) TySubst
 uUnrefined subst x (TyVar x') 
   | x == x'               = Right subst
   | Just t' <- subst ! x' = uUnrefined subst x t'

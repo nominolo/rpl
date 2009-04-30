@@ -39,7 +39,7 @@ data Expr
 
 -- | Return the source span of an expression.
 exprSpan :: Expr -> SrcSpan
-exprSpan exp = case exp of
+exprSpan expr = case expr of
   ELit s _     -> s
   EVar s _     -> s
   ELam s _ _   -> s
@@ -54,11 +54,11 @@ exprSpan exp = case exp of
 mkLam :: SrcSpan -- ^ Location of the @\\@
       -> [Pat] -> Expr -> Expr  
 mkLam _ [] e = e
-mkLam loc (p:ps) exp = ELam (loc `combineSpans` l') p (go ps)
+mkLam loc (p:ps) expr = ELam (loc `combineSpans` l') p (go ps)
   where
-    go []     = exp
-    go (p:ps) = ELam (patSpan p `combineSpans` l') p (go ps)
-    l' = exprSpan exp
+    go []     = expr
+    go (p':ps') = ELam (patSpan p' `combineSpans` l') p' (go ps')
+    l' = exprSpan expr
 
 -- | Construct nested applications from an n-ary application. I.e., 
 --
@@ -90,14 +90,14 @@ patSpan pat = case pat of
 --
 -- Inverse of 'mkApp'.
 viewApp :: Expr -> (Expr, [Expr])
-viewApp (EApp _ e1 e2) = go e1 [e2]
+viewApp (EApp _ e1_0 e2_0) = go e1_0 [e2_0]
   where
     go (EApp _ e1 e2) args = go e1 (e2 : args)
     go fun_expr       args = (fun_expr, args)
-viewApp exp = panic $
+viewApp expr = panic $
     text "viemMultiApp can only be applied to expressions of the form (EApp ...)"
      $+$
-    text "Input was:" <+> text (show exp)
+    text "Input was:" <+> text (show expr)
 
 ------------------------------------------------------------------------
 -- * Pretty Instances
@@ -107,11 +107,11 @@ instance Pretty Lit where
   ppr (CharLit c) = text (show c)
 
 instance Pretty Expr where
-  ppr exp = case exp of
+  ppr expr = case expr of
     ELit _ l -> ppr l
     EVar _ v -> ppr v
     ELam _ p e -> ppr_lam e [p]
-    EApp _ _ _ -> ppr_app exp
+    EApp _ _ _ -> ppr_app expr
     ELet _ v e1 e2 -> 
         keyword "let" <+> ppr v <+> char '=' <+> ppr e1 <+> keyword "in" $$
         ppr e2
@@ -125,6 +125,7 @@ instance Pretty Expr where
 -- > \x y -> foo
 --
 -- TODO: don't do this if we have shadowed bindings (i.e. @\x -> \x -> ...@)
+ppr_lam :: Expr -> [Pat] -> PDoc
 ppr_lam inner_expr outer_pats =
   case inner_expr of
     ELam _ pat e -> ppr_lam e (pat : outer_pats)
@@ -138,7 +139,7 @@ ppr_lam inner_expr outer_pats =
 -- > (((f x) y) z)   ~~>   (f x y z)
 -- 
 ppr_app :: Expr -> PDoc
-ppr_app exp | (f, es) <- viewApp exp = parens (ppr f <+> sep (map ppr es))
+ppr_app expr | (f, es) <- viewApp expr = parens (ppr f <+> sep (map ppr es))
 
 
 instance Pretty Pat where

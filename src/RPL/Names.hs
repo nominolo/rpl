@@ -43,11 +43,13 @@ instance Arbitrary Id where arbitrary = arbLowercase
 instance Arbitrary (Uppercase Id) where
   arbitrary = Uppercase `fmap` arbUppercase
 
+arbLowercase :: Gen Id
 arbLowercase = do
    n <- sized (\n -> elements (take (n+1) simpleNames))
    let i = product (map ord n)
    return (Id (uniqueFromInt i) n)
 
+arbUppercase :: Gen Id
 arbUppercase = do
    n <- fmap (map toUpper) $ sized (\n -> elements (take (n+1) simpleNames))
    let i = product (map ord n)

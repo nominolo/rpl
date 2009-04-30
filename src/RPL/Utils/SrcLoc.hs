@@ -115,7 +115,7 @@ data SrcSpan
   deriving (Eq, Show)
 
 instance Pretty SrcSpan where
-  ppr span = case span of
+  ppr sp = case sp of
     SrcSpanOneLine f l c1 c2 _ _ ->
         text f <> colon <> int l <> colon <> int c1 <> char '-' <> int c2
     SrcSpanMultiLine f l1 c1 l2 c2 _ _ ->

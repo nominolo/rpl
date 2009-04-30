@@ -109,10 +109,10 @@ hang d1 n d2 sty = P.hang (d1 sty) n (d2 sty)
 
 -- | @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
 punctuate :: PDoc -> [PDoc] -> [PDoc]
-punctuate p [] = []
+punctuate _ [] = []
 punctuate p (d:ds) = go d ds
-  where go d []     = [d]
-        go d (e:es) = (d <> p) : go e es
+  where go d' []     = [d']
+        go d' (e:es) = (d' <> p) : go e es
 
 -- ** Parenthesis
 
@@ -136,6 +136,7 @@ comma _ = P.comma
 arrow :: PDoc
 arrow _ = P.text "->"
 
+colon :: PDoc
 colon _ = P.colon
 
 -- | A string where words are automatically wrapped.
@@ -172,7 +173,7 @@ keyword = bold . text
 ifDebugStyle :: PDoc -> PDoc
 ifDebugStyle d sty@DebugStyle = 
   ansiTermStyle "90" d sty
-ifDebugStyle d _ = P.empty
+ifDebugStyle _d _ = P.empty
 
 
 -- ** Utils
