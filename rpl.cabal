@@ -53,3 +53,24 @@ Executable rplc
                               RPL.Utils.Pretty
                               RPL.Utils.Unique
   Main-Is:                    Main.hs
+
+Executable testsuite
+  Hs-Source-Dirs:             src
+  Main-Is:                    RPL/Test/Main.hs
+  Other-Modules:              RPL.Syntax
+                              RPL.Lexer
+                              RPL.Error
+                              RPL.Test.Utils
+                              RPL.Test.Lexer
+
+  Build-Depends:              QuickCheck      == 2.*,
+                              base            == 4.*,
+                              pretty          == 1.0.*,
+                              array           == 0.2.*,
+                              utf8-string     == 0.3.*,
+                              bytestring      == 0.9.*,
+                              containers      == 0.2.*,
+                              test-framework  == 0.2.*,
+                              test-framework-hunit       == 0.2.*,
+                              test-framework-quickcheck2 == 0.2.*,
+                              HUnit           == 1.2.*
