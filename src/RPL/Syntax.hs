@@ -37,6 +37,7 @@ data Expr
   | ELet SrcSpan Pat Expr Expr    -- let x = E in F
   deriving (Show)
 
+-- | Return the source span of an expression.
 exprSpan :: Expr -> SrcSpan
 exprSpan exp = case exp of
   ELit s _     -> s
@@ -45,11 +46,12 @@ exprSpan exp = case exp of
   EApp s _ _   -> s
   ELet s _ _ _ -> s
 
--- | Construct an expression from a lambda with multiple arguments.
+-- | Construct a multi-argument lambda.
 --
--- > \ x_1 ... x_n -> E   ~~>   \ x_1 -> \x_2 -> ... \x_n -> E
---
-mkLam :: SrcSpan -- ^ Location of the "\"
+-- @
+-- \ x_1 ... x_n -> E   ~~>   \ x_1 -> \x_2 -> ... \x_n -> E
+-- @
+mkLam :: SrcSpan -- ^ Location of the @\\@
       -> [Pat] -> Expr -> Expr  
 mkLam _ [] e = e
 mkLam loc (p:ps) exp = ELam (loc `combineSpans` l') p (go ps)
@@ -61,7 +63,6 @@ mkLam loc (p:ps) exp = ELam (loc `combineSpans` l') p (go ps)
 -- | Construct nested applications from an n-ary application. I.e., 
 --
 -- > mkApp f [x,y,z] = (((f x) y) z)
---
 mkApp :: Expr -> [Expr] -> Expr
 mkApp fun [] = fun
 mkApp fun (e:es) =
