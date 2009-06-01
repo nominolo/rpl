@@ -6,7 +6,7 @@ import RPL.Lexer hiding ( main )
 import RPL.Utils.SrcLoc
 import RPL.Error
 
-import Test.Framework (defaultMain, testGroup)
+import Test.Framework as F (testGroup, Test)
 import Test.Framework.Providers.HUnit
 --import Test.Framework.Providers.QuickCheck (testProperty)
 
@@ -19,6 +19,7 @@ tokens s =
     Left e -> Left (errMsg e)
     Right ts -> Right ts
 
+tests :: [F.Test]
 tests = [ testGroup "tokens" $
   [ testCase "markers" $
       tokens_success
