@@ -1,0 +1,46 @@
+Name:            rpl
+Version:         0.1
+License:         BSD3
+License-File:    ../LICENSE
+Author:          Thomas Schilling <nominolo@googlemail.com>
+Maintainer:      Thomas Schilling <nominolo@googlemail.com>
+Homepage:        http://github.com/nominolo/rpl
+Description:     The Round Pie-in-the-Sky Language.
+Synopsis:        The Round Pie Language.
+Category:        Language
+Stability:       provisional
+Build-Type:      Simple
+Cabal-Version:   >= 1.4
+Extra-Source-Files: README.markdown
+
+Flag debug
+  Description: Turn on debugging features
+  Default: True
+
+Library
+  Build-Depends:              QuickCheck      == 2.*,
+                              base            == 4.*,
+                              pretty          == 1.0.*,
+                              array           == 0.2.*,
+                              utf8-string     == 0.3.*,
+                              bytestring      == 0.9.*,
+                              containers      == 0.2.*
+  GHC-Options:                -Wall
+  Exposed-Modules:            
+                              RPL.Names
+                              RPL.Error
+                              RPL.Lexer
+                              RPL.Parser
+                              RPL.Syntax
+                              RPL.Type
+                              RPL.BuiltIn
+                              RPL.Typecheck.Monad
+                              RPL.Typecheck.Subst
+                              RPL.Typecheck.Unify
+                              RPL.Typecheck.AlgorithmW
+                              RPL.Typecheck.InferHMX
+                              RPL.Utils.Monads
+                              RPL.Utils.Panic
+                              RPL.Utils.Pretty
+                              RPL.Utils.SrcLoc
+                              RPL.Utils.Unique

@@ -1,0 +1,26 @@
+Name:            rplc
+Version:         0.1
+License:         BSD3
+License-File:    ../LICENSE
+Author:          Thomas Schilling <nominolo@googlemail.com>
+Maintainer:      Thomas Schilling <nominolo@googlemail.com>
+Homepage:        http://github.com/nominolo/rpl
+Description:     The Round Pie-in-the-Sky Language Compiler
+Synopsis:        The Round Pie Language.
+Category:        Language
+Stability:       provisional
+Build-Type:      Simple
+Cabal-Version:   >= 1.4
+Extra-Source-Files: README.markdown
+
+Executable rplc
+  Build-Depends:              QuickCheck      == 2.*,
+                              base            == 4.*,
+                              pretty          == 1.0.*,
+                              array           == 0.2.*,
+                              utf8-string     == 0.3.*,
+                              bytestring      == 0.9.*,
+                              containers      == 0.2.*,
+                              rpl             == 0.1.*
+  GHC-Options:                -Wall
+  main-is:                    Main.hs
