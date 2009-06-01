@@ -26,8 +26,16 @@ instance Show TySubst where
 class HasTySubst a where
   apply :: TySubst -> a -> a
 
+-- | The empty (identity) substitution.
 emptyTySubst :: TySubst
 emptyTySubst = TySubst M.empty
+
+tySubstDomain :: TySubst -> Set TyVar
+tySubstDomain (TySubst m) = M.keysSet m
+
+tySubstFromList :: [(TyVar, Type)] -> TySubst
+tySubstFromList =
+    foldl' (\s (x,t) -> addTySubstBinding s x t) emptyTySubst
 
 -- | `composeTySubst s1 s2` first applies substitution `s2`, then on the
 -- result applies substitution `s1`.  That is
