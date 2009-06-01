@@ -61,11 +61,22 @@ $(DIST)/rplc/build/rplc/rplc: $(DIST)/rplc/setup-config
 	@cd rplc && \
 	../$(SETUP) build --builddir=../$(DIST)/rplc $(CABAL_FLAGS)
 
-.PHONY: clean all lib comp
+$(DIST)/testsuite/setup-config: $(SETUP) $(DIST)/lib-pkg-conf testsuite/rpl-testsuite.cabal
+	@echo === Configuring testsuite ================================
+	@cd testsuite && \
+	../$(SETUP) configure --with-compiler=$(HC) --with-hc-pkg=$(PKG) \
+		--user --builddir=../$(DIST)/testsuite $(CABAL_FLAGS)
+$(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite: $(DIST)/testsuite/setup-config
+	@echo === Building testsuite ===================================
+	@cd testsuite && \
+	../$(SETUP) build --builddir=../$(DIST)/testsuite $(CABAL_FLAGS)
 
-all: comp
+.PHONY: clean all lib comp suite
+
+all: comp suite
 lib: $(DIST)/lib/build/libHSrpl-0.1.a
 comp: $(DIST)/rplc/build/rplc/rplc
+suite: $(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite
 
 clean:
 	@$(RM) -rf $(SETUP_DIST) $(DIST)
