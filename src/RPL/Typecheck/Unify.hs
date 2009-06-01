@@ -1,6 +1,8 @@
 {-# LANGUAGE PatternGuards #-}
 module RPL.Typecheck.Unify where
 
+import Prelude hiding ( (!!) )
+
 import RPL.Typecheck.Subst
 import RPL.Type
 
@@ -52,14 +54,14 @@ unify2 subst (TyApp t1a t1b) (TyApp t2a t2b) =
 unify2 _subst t1 t2      = Left (t1, t2)
 
 uVar :: TySubst -> TyVar -> Type -> Either (Type, Type) TySubst
-uVar subst x t | Just t' <- subst ! x =
+uVar subst x t | Just t' <- subst !! x =
    unify2 subst t' t
 uVar subst x t = uUnrefined subst x t
 
 uUnrefined :: TySubst -> TyVar -> Type -> Either (Type, Type) TySubst
 uUnrefined subst x (TyVar x') 
   | x == x'               = Right subst
-  | Just t' <- subst ! x' = uUnrefined subst x t'
+  | Just t' <- subst !! x' = uUnrefined subst x t'
 uUnrefined subst x t =
   -- TODO: occurs check
   Right $ addTySubstBinding subst x t

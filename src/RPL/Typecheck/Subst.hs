@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 module RPL.Typecheck.Subst where
 
+import Prelude hiding ( (!!) )
+
 import RPL.Typecheck.Monad
 import RPL.Names
 import RPL.Type
@@ -43,12 +45,13 @@ composeTySubst s1@(TySubst m1) (TySubst m2) =
 (|->) :: TyVar -> Type -> TySubst
 x |-> a = TySubst (M.singleton x a)
 
-(!) :: TySubst -> TyVar -> Maybe Type
-(TySubst m) ! x = M.lookup x m
+(!!) :: TySubst -> TyVar -> Maybe Type
+(TySubst m) !! x = M.lookup x m
 
 addTySubstBinding :: TySubst -> TyVar -> Type -> TySubst
 addTySubstBinding (TySubst m) x t = TySubst (M.insert x t m)
 
+-- | Delete a the mapping for a variable.
 delTySubst :: TySubst -> TyVar -> TySubst
 delTySubst (TySubst m) x = TySubst (M.delete x m)
 
@@ -70,7 +73,7 @@ expandSubst :: TyVar -> TySubst -> Type
 expandSubst x0 s = go (TyVar x0)
   where
     go (TyVar x) =
-        case s ! x of
+        case s !! x of
           Nothing -> TyVar x
           Just t' -> go t'
     go c@(TyCon _ _) = c
@@ -105,7 +108,7 @@ cleanUpForUser ty =
 
 instance HasTySubst Type where
   apply s t@(TyVar i) =
-    case s ! i of
+    case s !! i of
       Just t' -> t'
       Nothing -> t
   apply _s t@(TyCon _ _) = t
