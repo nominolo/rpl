@@ -37,7 +37,7 @@ tests = [ testGroup "tokens" $
   , testCase "identifier" $
       tokens_success "foo foo' goo fo'o Foo fOO f_oo f01"
         [TokVar "foo",TokVar "foo'",TokVar "goo",
-         TokVar "fo'o",TokVar "Foo",TokVar "fOO",
+         TokVar "fo'o",TokCon "Foo",TokVar "fOO",
          TokVar "f_oo",TokVar "f01"]
 
   , testGroup "no identifier"

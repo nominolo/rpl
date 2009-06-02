@@ -23,6 +23,8 @@ import Data.Int      ( Int64 )
 
 $digit = 0-9
 $alpha = [a-zA-Z]
+$lower = [a-z]
+$upper = [A-Z]
 
 tokens :-
 
@@ -39,9 +41,10 @@ tokens :-
   \\                              { \s _ -> return $ L s TokLambda }
   "->"                            { \s _ -> return $ L s TokRArrow }
   "::"                            { \s _ -> return $ L s TokDblColon }
-  "("                            { \s _ -> return $ L s TokOParen }
-  ")"                            { \s _ -> return $ L s TokCParen }
-  $alpha [$alpha $digit \_ \']*   { \s t -> return $ L s (TokVar t) }
+  "("                             { \s _ -> return $ L s TokOParen }
+  ")"                             { \s _ -> return $ L s TokCParen }
+  $lower [$alpha $digit \_ \']*   { \s t -> return $ L s (TokVar t) }
+  $upper [$alpha $digit \_ \']*   { \s t -> return $ L s (TokCon t) }
   [\* \/ \+ \- \= \~ \^ \& \!]+   { \s t -> return $ L s (TokOper t) }
 
 {
@@ -188,6 +191,7 @@ data Token
   | TokOParen
   | TokCParen
   | TokVar String
+  | TokCon String
   | TokOper String
   | TokInt Int
   | TokEof
