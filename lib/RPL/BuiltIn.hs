@@ -4,11 +4,11 @@ import RPL.Names
 import RPL.Type
 import RPL.Utils.Unique
 
-typeInt :: Type
-typeInt = TyCon (Id (uniqueFromInt 1) "Int") 0
+typeInt :: TyCon
+typeInt = MkTyCon (Id (uniqueFromInt 1) "Int") 0
 
-typeChar :: Type
-typeChar = TyCon (Id (uniqueFromInt 2) "Char") 0
+typeChar :: TyCon
+typeChar = MkTyCon (Id (uniqueFromInt 2) "Char") 0
 
-typeMaybe :: Type
-typeMaybe = TyCon (Id (uniqueFromInt 3) "Maybe") 1
+typeMaybe :: TyCon
+typeMaybe = MkTyCon (Id (uniqueFromInt 3) "Maybe") 1

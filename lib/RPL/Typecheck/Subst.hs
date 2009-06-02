@@ -84,7 +84,7 @@ expandSubst x0 s = go (TyVar x0)
         case s !! x of
           Nothing -> TyVar x
           Just t' -> go t'
-    go c@(TyCon _ _) = c
+    go c@(TyCon _) = c
     go (TyApp t1 t2) = go t1 `TyApp` go t2
 
 -- | Normalise type to use only easily distinguishable type variables.
@@ -106,7 +106,7 @@ cleanUpForUser ty =
          Just x'  -> return (TyVar x', m, ns)
          Nothing -> do x' <- freshTyVar (head ns)
                        return (TyVar x', M.insert x x' m, tail ns)
-    go c@(TyCon _ _) m ns = return (c, m, ns)
+    go c@(TyCon _) m ns = return (c, m, ns)
     go (TyApp t1 t2) m ns = do
         (t1', m', ns') <- go t1 m ns
         (t2', m'', ns'') <- go t2 m' ns'
@@ -119,7 +119,7 @@ instance HasTySubst Type where
     case s !! i of
       Just t' -> t'
       Nothing -> t
-  apply _s t@(TyCon _ _) = t
+  apply _s t@(TyCon _) = t
   apply s (TyApp t1 t2) = TyApp (apply s t1) (apply s t2)
 
 instance HasTySubst TypeScheme where

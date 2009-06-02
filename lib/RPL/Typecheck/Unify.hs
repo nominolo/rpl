@@ -16,8 +16,8 @@ import RPL.Type
 unify :: Type -> Type -> Either (Type,Type) TySubst
 unify (TyVar i) (TyVar j)
   | i == j                      = Right emptyTySubst
-unify (TyCon c i) (TyCon c' i')
-  | c == c' && i == i'          = Right emptyTySubst
+unify (TyCon c) (TyCon c')
+  | c == c'                     = Right emptyTySubst
 unify (TyVar i) t               = Right (i |-> t)
 unify t (TyVar i)               = Right (i |-> t)
 unify (TyApp t1 t2) (TyApp t3 t4) =
@@ -45,8 +45,8 @@ unify2 :: TySubst -> Type -> Type -> Either (Type, Type) TySubst
 --unify2 subst t1 t2 | trace (pretty (subst, [t1, t2])) False = undefined 
 unify2 subst (TyVar x) t = uVar subst x t
 unify2 subst t (TyVar x) = uVar subst x t
-unify2 subst (TyCon c i) (TyCon c' i')
-  | c == c' && i == i'   = Right subst
+unify2 subst (TyCon c) (TyCon c')
+  | c == c'              = Right subst
 unify2 subst (TyApp t1a t1b) (TyApp t2a t2b) =
    case unify2 subst t1a t2a of
      r@(Left _) -> r

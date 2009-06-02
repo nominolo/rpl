@@ -3,9 +3,9 @@ module RPL.Type
   ( -- * Types
     Type(..), Term, (.->.), mkFun, ftv
   , -- * Type Constructors
-    TyCon, isInfixTyCon
+    isInfixTyCon, tyConApp, TyCon(..), (@@)
     -- * Type Variables
-  , TyVar, tyVarId, mkTyVar
+  , TyVar, tyVarId, mkTyVar, mkSkolem
     -- * Constraints
   , Constraint, Constraints, (===), (/\)
     -- * Type Schemes
@@ -19,6 +19,7 @@ import RPL.Utils.Unique
 
 import Data.Set ( Set )
 import qualified Data.Set as S
+import Data.List ( foldl' )
 
 -- Testing
 import Test.QuickCheck
@@ -29,16 +30,27 @@ import Test.QuickCheck
 -- | The Type of Types
 data Type
   = TyVar TyVar
-  | TyCon TyCon Int
+  | TyCon TyCon
   | TyApp Type Type
   deriving (Eq, Ord, Show)
 
-type TyCon = Id  -- for now
+data TyCon = MkTyCon 
+  { tyConName :: Id
+  , tyConArity :: Int
+  } deriving (Eq, Ord, Show)
+
 type Term = Type
-newtype TyVar = TV { tyVarId :: Id } deriving (Eq, Ord, Show)
+data TyVar
+  = -- | A user-named variable.
+    TV { tyVarId :: Id }
+  | Skolem { tyVarId :: Id }
+  deriving (Eq, Ord, Show)
 
 mkTyVar :: Id -> TyVar
 mkTyVar = TV
+
+mkSkolem :: Id -> TyVar
+mkSkolem = Skolem
 
 data Constraint
   = CEquals Term Term
@@ -77,14 +89,19 @@ mkForall vs c t = ForAll vs c t
 class ToType a       where toType :: a -> Type
 instance ToType Type  where toType = id
 instance ToType TyVar where toType = TyVar
+instance ToType TyCon where toType = TyCon
 
 typeFun :: Type
-typeFun = TyCon funTyCon 2
+typeFun = TyCon funTyCon
 
 funTyCon :: TyCon
-funTyCon = Id (uniqueFromInt 3) "->"
+funTyCon = MkTyCon (Id (uniqueFromInt 3) "->") 2
 
 infixr 6 .->.
+infixl 7 @@
+
+(@@) :: (ToType a, ToType b) => a -> b -> Type
+t1 @@ t2 = toType t1 `TyApp` toType t2
 
 -- | Creates a function type.
 (.->.) :: (ToType l, ToType r) => l -> r -> Type
@@ -106,12 +123,15 @@ mkFun []     = error "mkFun: expects at least one argument"
 mkFun [t]    = toType t
 mkFun (t:ts) = TyApp (TyApp typeFun (toType t)) (mkFun ts)
 
+tyConApp :: TyCon -> [Type] -> Type
+tyConApp tcon args = foldl' TyApp (TyCon tcon) args
+
 -- ** Free Variables
 
 -- | Free Type Variables.
 ftv :: Type -> Set TyVar
 ftv (TyVar v)     = S.singleton v
-ftv (TyCon _ _ts)  = S.empty
+ftv (TyCon _)     = S.empty
 ftv (TyApp t1 t2) = S.union (ftv t1) (ftv t2)
 
 -- | Free Type Variables of a type scheme.
@@ -139,6 +159,8 @@ instance Pretty TyVar where
 
 instance Pretty Type where
   ppr typ = ppr_type typ
+instance Pretty TyCon where
+  ppr (MkTyCon n _) = ppr n
 
 ppr_type :: Type -> PDoc
 ppr_type t = ppr_type' 0 t
@@ -149,8 +171,8 @@ ppr_parens False d = d
 
 ppr_type' :: Int -> Type -> PDoc
 ppr_type' _ (TyVar v) = ppr v
-ppr_type' _ (TyCon c _) = ppr c
-ppr_type' d (TyApp (TyApp (TyCon c _) t) t')
+ppr_type' _ (TyCon c) = ppr c
+ppr_type' d (TyApp (TyApp (TyCon c) t) t')
   | isInfixTyCon c =
       let prec = infixTyConPrecedence c
           (prec_left, prec_right) =
@@ -211,7 +233,7 @@ instance Arbitrary Type where
           frequency
             [(2, TyVar `fmap` TV `fmap` arbitrary)
             ,(1, do (Uppercase n) <- arbitrary
-                    return (TyCon n 0))]
+                    return (TyCon (MkTyCon n 0)))]
       gen_node_or_leaf n =
           frequency
             [(1,gen_node)
