@@ -26,7 +26,7 @@ import RPL.Utils.Panic
 data Lit
   = IntLit Int
   | CharLit Char
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- | An expression.
 data Expr
@@ -36,14 +36,15 @@ data Expr
   | EApp SrcSpan Expr Expr       -- E F
   | ELet SrcSpan Pat Expr Expr   -- let x = E in F
   | EAnn SrcSpan Expr Type       -- (e :: t)
-  deriving (Show)
+  deriving (Eq, Show)
 
 data Type
   = TVar SrcSpan Id
-  | TCon SrcSpan Id [Type]
+  | TCon SrcSpan Id
+  | TApp SrcSpan Type Type
   | TFun SrcSpan Type Type
   | TAll SrcSpan Id Type
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- | Return the source span of an expression.
 exprSpan :: Expr -> SrcSpan
@@ -58,9 +59,10 @@ exprSpan expr = case expr of
 typeSpan :: Type -> SrcSpan
 typeSpan ty = case ty of
   TVar s _    -> s
-  TCon s _ _  -> s
+  TCon s _    -> s
   TFun s _ _  -> s
   TAll s _ _  -> s
+  TApp s _ _  -> s
 
 -- | Construct a multi-argument lambda.
 --
@@ -90,7 +92,7 @@ type Program = Expr
 -- | A pattern.
 data Pat
   = VarPat SrcSpan Id -- ^ Single variable pattern.
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- | Return source span of a pattern.
 patSpan :: Pat -> SrcSpan
@@ -136,9 +138,10 @@ instance Pretty Expr where
 instance Pretty Type where
   ppr ty = case ty of
     TVar _ v -> ppr v
-    TCon _ tc ts -> ppr tc <+> fsep (map ppr ts)
+    TCon _ tc -> ppr tc
     TFun _ t1 t2 -> ppr t1 <+> text "->" <+> ppr t2
     TAll _ x t -> text "forall" <+> ppr x <> char '.' <+> ppr t
+    TApp _ t1 t2 -> ppr t1 <+> ppr t2
 
 -- Combine nested lambdas into one top-level lambda.  I.e.,
 --

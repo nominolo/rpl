@@ -29,9 +29,11 @@ fromUserType ty = do
     outer (Syn.TAll _ v t) = do (vs, t') <- outer t; return (v:vs, t')
     outer t = do t' <- inner t; return ([], t')
 
+    -- TODO: lookup the type constructor in the environment
     inner rho = case rho of
       Syn.TVar _ v    -> return $ TyVar (mkTyVar v)
-      Syn.TCon _ n ts -> tyConApp (MkTyCon n (length ts)) <$> mapM inner ts
+      Syn.TCon _ n    -> return $ TyCon (MkTyCon n 0)
+      Syn.TApp _ t t' -> (@@) <$> inner t <*> inner t'
       Syn.TFun _ t t' -> (.->.) <$> inner t <*> inner t'
       Syn.TAll s v t  ->
           tcError (typeSpan ty) $ WrongUserType $

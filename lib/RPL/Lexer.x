@@ -37,6 +37,7 @@ tokens :-
   case                            { \s _ -> return $ L s TokCase }
   of                              { \s _ -> return $ L s TokOf }
   $digit+                         { \s t -> return $ L s (TokInt (read t)) }
+  "."                             { \s _ -> return $ L s TokDot }
   "="                             { \s _ -> return $ L s TokEqual }
   \\                              { \s _ -> return $ L s TokLambda }
   "->"                            { \s _ -> return $ L s TokRArrow }
@@ -184,6 +185,7 @@ data Token
   | TokCase
   | TokOf
   | TokSym Char
+  | TokDot
   | TokEqual
   | TokLambda
   | TokRArrow

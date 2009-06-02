@@ -44,6 +44,7 @@ data SrcLoc
        {-# UNPACK #-} !Int  -- Starts at 0
        {-# UNPACK #-} !Int  -- Offset from beginning of buffer
   | UnhelpfulLoc FastString  -- Just a general indication
+  deriving (Eq)
 
 instance Pretty SrcLoc where
   ppr (SrcLoc s l c _) = text s <> colon <> int l <> colon <> int c
@@ -65,6 +66,11 @@ advanceSrcLoc (SrcLoc f l c o) ch = case ch of
   where
     tab chr = chr .&. complement 7 + 8
 advanceSrcLoc loc _ = loc
+
+-- | An unhelpful SrcLoc.  This is used for testing where we want to ignore
+-- locations when comparing expressions.
+dummyLoc :: SrcLoc
+dummyLoc = UnhelpfulLoc ""
 
 ------------------------------------------------------------------------
 -- * Source Regions
