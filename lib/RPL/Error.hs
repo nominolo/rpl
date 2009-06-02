@@ -20,6 +20,7 @@ data ErrorMessage
   | NotInScope Id
   | TypeMismatch String String
   | MultiplePatVars [Id]
+  | WrongUserType PDoc
   deriving (Eq, Show)
 
 ------------------------------------------------------------------------
@@ -42,3 +43,4 @@ instance Pretty ErrorMessage where
     MultiplePatVars vs ->
         wrappingText "Multiple occurrences of pattern variables:" $$
         nest 4 (fsep (commaSep (map ppr vs)))
+    WrongUserType str -> str

@@ -5,26 +5,81 @@
 -- 
 module RPL.Test.Typecheck where
 
-import Prelude hiding ( (!!) )
-
+--import RPL.Names
 import RPL.Type
-import RPL.Typecheck.Subst ( TySubst, apply, emptyTySubst, tySubstFromList
-                           , addTySubstBinding, (!!) )
-import RPL.Typecheck.Monad
-import RPL.Utils.Panic
-import RPL.Syntax
-import RPL.Utils.SrcLoc (noSrcSpan)
+import RPL.Syntax hiding ( Type(..) )
+import RPL.BuiltIn
+import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
+import RPL.Typecheck.Monad
+import RPL.Typecheck.Utils
 
-import Data.Maybe ( isJust )
-import Control.Monad ( forM )
-import Control.Applicative
-
-import qualified Data.Set as S
-
+import Test.Framework as F (testGroup, Test)
+import Test.Framework.Providers.HUnit
+import Test.HUnit
 import Test.QuickCheck
+import Data.Maybe ( isJust, isNothing )
 import Debug.Trace
 
+tests :: [F.Test]
+tests = [ testGroup "typecheck" $
+  [ testCase "freshTyVar" $ runTcM' $
+      do [a,b] <- mapM freshTyVar ["a", "b"]
+         return (a == b @?= False)
+  , testCase "mkFun/1" $ runTcM' $ do
+      [a,b,c] <- mapM freshTyVar ["a", "b", "c"]
+      return $ (a .->. b .->. c) @?= (a .->. (b .->. c))
+  , testCase "mkFun/2" $ runTcM' $ do
+      [a,b,c] <- mapM freshTyVar ["a", "b", "c"]
+      return $ mkFun [a, b, c] @?= (a .->. (b .->. c))
+  , testCase "TyApp assoc" $ runTcM' $ do
+      [a,b,c] <- mapM freshTyVar ["a", "b", "c"]
+      return $ a @@ b @@ c @?= (a @@ b) @@ c
+
+  , testCase "instanceOf/1" $ runTcM' $ do
+      [a,b] <- mapM freshTyVar ["a", "b"]
+      let s1 = mkForall [a] [] (typeMaybe @@ a .->. typeMaybe @@ a)
+          s2 = mkForall [b] [] (b .->. b)
+      instanceOfCheck True s1 s2
+  , testCase "instanceOf/2" $ runTcM' $ do
+      [a,b] <- mapM freshTyVar ["a", "b"]
+      let s1 = mkForall [a] [] ((a .->. a) .->. (a .->. a))
+          s2 = mkForall [b] [] (b .->. b)
+      instanceOfCheck True s1 s2
+  , testCase "instanceOf/3" $ runTcM' $ do
+      [a,b] <- mapM freshTyVar ["a", "b"]
+      let s1 = mkForall [a] [] ((a .->. a) .->. (a .->. a))
+          s2 = mkForall [b] [] (b .->. b)
+      instanceOfCheck False s2 s1
+  , testCase "instanceOf/4" $ runTcM' $ do
+      [a,b] <- mapM freshTyVar ["a", "b"]
+      let s1 = mkForall [a] [] ((a .->. a) .->. a)
+          s2 = mkForall [b] [] (b .->. b)
+      instanceOfCheck False s1 s2
+  , testCase "instanceOf/5" $ runTcM' $ do
+      [a,b] <- mapM freshTyVar ["a", "b"]
+      let s1 = mkForall [a] [] (typeInt .->. a)
+          s2 = mkForall [b] [] (b .->. b)
+      instanceOfCheck False s1 s2
+  ]]
+
+instanceOfCheck :: Bool -> TypeScheme -> TypeScheme -> TcM Assertion
+instanceOfCheck exp s1 s2 = do
+    b <- s1 `isInstanceOf` s2
+    return $ exp == b @? msg
+  where msg = pretty s1 ++ (if exp then " <= " else " !<= ") ++ pretty s2
+
+runTcM' :: TcM Assertion -> Assertion
+runTcM' m =
+  case runTcM m of
+    Left err -> assertFailure $ "Typechecking failed with: " ++ show err
+    Right a  -> a
+
+withTyVars :: ([TyVar] -> Assertion) -> Assertion
+withTyVars f = runTcM' $ f <$> mapM freshTyVar simpleNames
+  
+
+{-
 -- | Check whether the first argument is an instance of the second one.
 --
 -- Automatically calculates a substitution.  The rules are
@@ -60,7 +115,7 @@ isInstanceOf' (ForAll tvs1 _ t1_0) (ForAll tvs2 _ t2_0) =
             Just t' ->
                 if t1 == t' then Just s else Nothing
       | t1 == t2           = Just s
-    check s t1@(TyCon _ _) t2@(TyCon _ _)
+    check s t1@(TyCon _) t2@(TyCon _)
       | t1 == t2           = Just s
     check s (TyApp t1a t1b) (TyApp t2a t2b) = do
       s' <- check s t1a t2a
@@ -86,7 +141,7 @@ isInstanceOf' (ForAll tvs1 _ t1_0) (ForAll tvs2 _ t2_0) =
             x' <- TyVar <$> (freshTyVar . ("skol_"++) . idString . tyVarId $ x)
             return (x, x')
       return (check emptyTySubst (apply (tySubstFromList skolems) t1_0) t2_0)
-
+-}
 -- * Generating well-typed terms
 
 

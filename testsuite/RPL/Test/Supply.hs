@@ -26,6 +26,13 @@ tests = [ testGroup "supply" $
          let (s1',s1'') = split2 s1
          let (s2',s2'') = split2 s2
          allDifferent $ map supplyValue [s1, s1', s1'', s2, s2', s2'']
+  , testCase "modify" $
+      do s0 <- newSupply (0 :: Int) (1+)
+         let s1 = modifySupply s0 (\s -> "i"++ show (supplyValue s))
+         let (s0', s0'') = split2 s0
+         let (s1', s1'') = split2 s1
+         (supplyValue s0, supplyValue s0', supplyValue s0'') @?= (0, 1, 2)
+         (supplyValue s1, supplyValue s1', supplyValue s1'') @?= ("i0", "i1", "i2")
   , testProperty "split_n" prop_split
   ]]
 

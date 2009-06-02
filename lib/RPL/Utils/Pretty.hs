@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances #-}
 -- |
 -- Module      : RPL.Utils.Pretty
 -- Copyright   : (c) Thomas Schilling 2009
@@ -26,6 +27,9 @@ class Pretty a where
   ppr :: a -> PDoc
 
 type PDoc = PrettyStyle -> P.Doc
+
+instance Show PDoc where show = render
+instance Eq PDoc where x == y = show x == show y
 
 data PrettyStyle
   = DebugStyle

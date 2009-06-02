@@ -17,6 +17,9 @@ data Id = Id !Unique String
 idString :: Id -> String
 idString (Id _ n) = n
 
+idUnique :: Id -> Unique
+idUnique (Id u _) = u
+
 isBuiltInName :: Id -> Bool
 isBuiltInName (Id u _) = intFromUnique u < 100
 

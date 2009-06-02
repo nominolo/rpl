@@ -156,6 +156,7 @@ c1 /\ c2 = c1 ++ c2
 
 instance Pretty TyVar where
   ppr (TV x) = ppr x
+  ppr (Skolem v) = text (idString v) <> char '_' <> ppr (idUnique v)
 
 instance Pretty Type where
   ppr typ = ppr_type typ

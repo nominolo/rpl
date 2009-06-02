@@ -24,7 +24,8 @@ Library
                               array           == 0.2.*,
                               utf8-string     == 0.3.*,
                               bytestring      == 0.9.*,
-                              containers      == 0.2.*
+                              containers      == 0.2.*,
+                              value-supply    == 0.5.*
   GHC-Options:                -Wall
   Exposed-Modules:            
                               RPL.Names
@@ -37,6 +38,7 @@ Library
                               RPL.Typecheck.Monad
                               RPL.Typecheck.Subst
                               RPL.Typecheck.Unify
+                              RPL.Typecheck.Utils
                               RPL.Typecheck.AlgorithmW
                               RPL.Typecheck.InferHMX
                               RPL.Utils.Monads

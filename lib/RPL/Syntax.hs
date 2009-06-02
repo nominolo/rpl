@@ -34,7 +34,15 @@ data Expr
   | EVar SrcSpan Id              -- x
   | ELam SrcSpan Pat Expr        -- \ x -> E
   | EApp SrcSpan Expr Expr       -- E F
-  | ELet SrcSpan Pat Expr Expr    -- let x = E in F
+  | ELet SrcSpan Pat Expr Expr   -- let x = E in F
+  | EAnn SrcSpan Expr Type       -- (e :: t)
+  deriving (Show)
+
+data Type
+  = TVar SrcSpan Id
+  | TCon SrcSpan Id [Type]
+  | TFun SrcSpan Type Type
+  | TAll SrcSpan Id Type
   deriving (Show)
 
 -- | Return the source span of an expression.
@@ -45,6 +53,14 @@ exprSpan expr = case expr of
   ELam s _ _   -> s
   EApp s _ _   -> s
   ELet s _ _ _ -> s
+  EAnn s _ _   -> s
+
+typeSpan :: Type -> SrcSpan
+typeSpan ty = case ty of
+  TVar s _    -> s
+  TCon s _ _  -> s
+  TFun s _ _  -> s
+  TAll s _ _  -> s
 
 -- | Construct a multi-argument lambda.
 --
@@ -115,6 +131,14 @@ instance Pretty Expr where
     ELet _ v e1 e2 -> 
         keyword "let" <+> ppr v <+> char '=' <+> ppr e1 <+> keyword "in" $$
         ppr e2
+    EAnn _ e t -> parens $ ppr e <+> text "::" <+> ppr t
+
+instance Pretty Type where
+  ppr ty = case ty of
+    TVar _ v -> ppr v
+    TCon _ tc ts -> ppr tc <+> fsep (map ppr ts)
+    TFun _ t1 t2 -> ppr t1 <+> text "->" <+> ppr t2
+    TAll _ x t -> text "forall" <+> ppr x <> char '.' <+> ppr t
 
 -- Combine nested lambdas into one top-level lambda.  I.e.,
 --

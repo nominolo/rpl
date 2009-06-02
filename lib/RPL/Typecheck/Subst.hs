@@ -129,8 +129,8 @@ instance HasTySubst TypeScheme where
 -- | Instantiate a type scheme to a monotype.  The substitution must be
 -- defined for every forall-quantified variable of the type scheme.  The
 -- result may contain skolems.
-instantiate :: TypeScheme -> TySubst -> Maybe Type
-instantiate (ForAll vs _c t) s@(TySubst m) =
+instantiate' :: TypeScheme -> TySubst -> Maybe Type
+instantiate' (ForAll vs _c t) s@(TySubst m) =
     checkDomain vs >> return (apply s t)
   where checkDomain [] = Just ()
         checkDomain (v:vs') | v `M.member` m = checkDomain vs'
