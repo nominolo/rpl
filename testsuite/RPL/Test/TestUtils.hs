@@ -1,4 +1,4 @@
-module RPL.Test.Utils where
+module RPL.Test.TestUtils where
 
 import Test.HUnit()
 

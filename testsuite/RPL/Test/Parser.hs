@@ -1,6 +1,6 @@
 module RPL.Test.Parser where
 
-import RPL.Test.Utils
+import RPL.Test.TestUtils
 
 import RPL.Syntax
 import RPL.Lexer hiding ( main )

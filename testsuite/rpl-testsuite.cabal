@@ -31,4 +31,4 @@ Executable rpl-testsuite
   GHC-Options:                -Wall
   main-is:                    RPL/Test/Main.hs
   Other-Modules:              RPL.Test.Lexer,
-                              RPL.Test.Utils
+                              RPL.Test.TestUtils

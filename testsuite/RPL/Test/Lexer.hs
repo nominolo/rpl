@@ -1,6 +1,6 @@
 module RPL.Test.Lexer where
 
-import RPL.Test.Utils
+import RPL.Test.TestUtils
 
 import RPL.Lexer hiding ( main )
 import RPL.Utils.SrcLoc
