@@ -4,6 +4,7 @@ import qualified RPL.Test.Lexer ( tests )
 import qualified RPL.Test.Parser ( tests )
 import qualified RPL.Test.Supply ( tests )
 import qualified RPL.Test.Typecheck ( tests )
+import qualified RPL.Test.Utils ( tests )
 
 import Test.Framework (defaultMain, Test)
 
@@ -13,6 +14,7 @@ tests = concat $
   , RPL.Test.Parser.tests
   , RPL.Test.Supply.tests
   , RPL.Test.Typecheck.tests
+  , RPL.Test.Utils.tests
   ]
 
 main :: IO ()

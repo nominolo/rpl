@@ -46,3 +46,4 @@ Library
                               RPL.Utils.Pretty
                               RPL.Utils.SrcLoc
                               RPL.Utils.Unique
+                              RPL.Utils.UnionFind
