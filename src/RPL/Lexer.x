@@ -28,13 +28,19 @@ tokens :-
   "--".*                          ;
   let                             { \s _ -> return $ L s TokLet }
   in                              { \s _ -> return $ L s TokIn }
+  data                            { \s _ -> return $ L s TokData }
+  where                           { \s _ -> return $ L s TokWhere }
+  case                            { \s _ -> return $ L s TokCase }
+  of                              { \s _ -> return $ L s TokOf }
   $digit+                         { \s t -> return $ L s (TokInt (read t)) }
   "="                             { \s _ -> return $ L s TokEqual }
   \\                              { \s _ -> return $ L s TokLambda }
   "->"                            { \s _ -> return $ L s TokRArrow }
+  "::"                            { \s _ -> return $ L s TokDblColon }
   "("                            { \s _ -> return $ L s TokOParen }
   ")"                            { \s _ -> return $ L s TokCParen }
   $alpha [$alpha $digit \_ \']*   { \s t -> return $ L s (TokVar t) }
+  [\* \/ \+ \- \= \~ \^ \& \!]+   { \s t -> return $ L s (TokOper t) }
 
 {
 ------------------------------------------------------------------------
@@ -164,13 +170,19 @@ parseFail = do
 data Token 
   = TokLet
   | TokIn
+  | TokData
+  | TokWhere
+  | TokCase
+  | TokOf
   | TokSym Char
   | TokEqual
   | TokLambda
   | TokRArrow
+  | TokDblColon
   | TokOParen
   | TokCParen
   | TokVar String
+  | TokOper String
   | TokInt Int
   | TokEof
   deriving (Eq,Show)
