@@ -40,7 +40,11 @@ Library
                               RPL.Typecheck.Unify
                               RPL.Typecheck.Utils
                               RPL.Typecheck.AlgorithmW
-                              RPL.Typecheck.InferHMX
+                              RPL.Typecheck.MultiEquation
+                              RPL.Typecheck.HMX
+                              RPL.Typecheck.HMX.Core
+                              RPL.Typecheck.HMX.Constraint
+                              RPL.Utils.Misc
                               RPL.Utils.Monads
                               RPL.Utils.Panic
                               RPL.Utils.Pretty
