@@ -19,6 +19,8 @@ import Data.Map ( Map )
 import Data.Set ( Set )
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.ByteString.Lazy      as B
+import qualified Data.ByteString.Lazy.UTF8 as B
 
 ------------------------------------------------------------------------
 -- * The =Pretty= Class
@@ -39,10 +41,10 @@ pretty :: Pretty a => a -> String
 pretty x = P.render (ppr x UserStyle)
 
 pprint :: Pretty a => a -> IO ()
-pprint x = putStrLn $ P.render $ ppr x UserStyle
+pprint x = B.putStrLn $ B.fromString $ render (ppr x)
 
 debugPrint :: Pretty a => a -> IO ()
-debugPrint x = putStrLn $ P.render $ ppr x DebugStyle
+debugPrint x = B.putStrLn $ B.fromString $ P.render $ ppr x DebugStyle
 
 render :: PDoc -> String
 render d = P.render (d UserStyle)
