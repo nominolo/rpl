@@ -25,14 +25,14 @@ data Constraint term var
   | And [Constraint term var]
     -- ^ Conjunction of constraints.
   | Let [TypeScheme term var] (Constraint term var)
-    -- ^ Generalises @let@ is more general  than @exists@ and @def@, so we
-    -- combine them into one thing.
+    -- ^ @let@ is more general than @exists@, @forall@ and @def@, so we
+    -- combine them into one thing.  See 'TypeScheme'.
   | InstanceOf SrcSpan SchemeName term
 
 -- | @ForAll loc rqs fqs c t@ represents a constraint language construct
 -- of the form:
 --
--- > forall rqs. exists fqs. [c] => t
+-- > forall rqs. exists fqs. [c]
 --
 -- @rqs@ are all rigid quantifiers, @fqs@ are all flexible quantifiers.
 -- (Intuitively: For variables that are @forall@ quantified we must be able to
@@ -61,10 +61,14 @@ infix 5 =?=
 t =?= t' = Equals noSrcSpan t t'
 
 infix 5 <?
+
+-- | Instance constraint.
 (<?) :: SchemeName -> term -> Constraint term var
 n <? t = InstanceOf noSrcSpan n t
 
 infixr 1 /\
+
+-- | Conjunction of two constraints.
 (/\) :: Constraint term var -> Constraint term var -> Constraint term var
 (CTrue _) /\ x         = x
 x         /\ (CTrue _) = x
@@ -73,12 +77,24 @@ x         /\ (CTrue _) = x
 x         /\ (And ys)  = And (x:ys)
 x         /\ y         = And [x, y]
 
+-- | @ex vs c@ builds the constraint
+--
+-- > exists vs. c@.
+--
 ex :: [Var] -> TConstraint -> TConstraint
 ex vs c = Let [ForAll noSrcSpan [] vs c M.empty] (CTrue noSrcSpan)
 
+-- | @forAll vs c@ build the constraint
+--
+-- > forall vs [ c ]. True
+--
 forAll :: [Var] -> TConstraint -> TConstraint
 forAll vs c = Let [ForAll noSrcSpan vs [] c M.empty] (CTrue noSrcSpan)
 
+-- | @exists f@ Creates a fresh variable @x@ and returns the constraint
+--
+-- > exists x. (f c)
+--
 exists :: (CrTerm -> IO TConstraint) -> IO TConstraint
 exists f = do
   var <- mkAnonVar Flexible
@@ -89,11 +105,21 @@ exists f = do
 -- (.<=.) :: Id -> Type -> Constraint
 -- (.<=.) = InstanceOf
 
+-- | The trivial constraint.
 true :: Constraint term var
 true = CTrue noSrcSpan
 
-scheme :: [Var] -> S.Set String
+-- | @scheme rqs fqs f@ builds the type scheme
+--
+-- > forall rqs . exists fqs' [ f fqs'' ]
+--
+-- where @fqs'@ are fresh variables with names from @fqs@ and @fqs''@ is a mapping
+-- from names in @fqs@ to variables.
+scheme :: [Var]        -- ^ The @forall@ quantified (rigid) variables.
+       -> S.Set String -- ^ Names for existentially qualified variables. (@fqs@)
        -> (M.Map String (CrTerm, SrcSpan) -> IO TConstraint)
+          -- ^ Receives a mapping from @fqs@ to variable terms and locations
+          -- and returns the constraints inside the forall.
        -> IO TScheme
 scheme vs names f = do
   (l, m) <- variableSet (const (Flexible, Nothing)) names
