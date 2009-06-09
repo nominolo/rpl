@@ -23,8 +23,8 @@
 -- Consequently that future lookups will be have a path length of at most 1.
 --
 module RPL.Utils.UnionFind 
-  ( Point, fresh, repr, descriptor, setDescriptor, union, equivalent,
-    redundant )
+  ( Point, fresh, repr, union, equivalent, redundant,
+    descriptor, setDescriptor, modifyDescriptor )
 where
 
 import Data.IORef
@@ -81,7 +81,7 @@ descrRef point@(Pt link_ref) = do
   link <- readIORef link_ref
   case link of
     Info info -> return info
-    Link pt@(Pt link'_ref) -> do
+    Link (Pt link'_ref) -> do
       link' <- readIORef link'_ref
       case link' of
         Info info -> return info
@@ -100,6 +100,11 @@ setDescriptor point new_descr = do
   r <- descrRef point
   modifyIORef r $ \i -> i { descr = new_descr }
 
+modifyDescriptor :: Point a -> (a -> a) -> IO ()
+modifyDescriptor point f = do
+  r <- descrRef point
+  modifyIORef r $ \i -> i { descr = f (descr i) }
+
 -- | /O(1)/. Join the equivalence classes of the points (which must be distinct).
 -- The resulting equivalence class will get the descriptor of the second
 -- argument.
@@ -114,7 +119,7 @@ union p1 p2 = do
   assert (point1 /= point2) $ do
   Info info_ref1 <- readIORef link_ref1
   Info info_ref2 <- readIORef link_ref2
-  MkInfo w1 d1 <- readIORef info_ref1
+  MkInfo w1 _d1 <- readIORef info_ref1 -- d1 is discarded
   MkInfo w2 d2 <- readIORef info_ref2
   -- Make the smaller tree a a subtree of the bigger one.  The idea is this: We
   -- increase the path length of one set by one.  Assuming all elements are
