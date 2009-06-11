@@ -25,7 +25,9 @@ Library
                               utf8-string     == 0.3.*,
                               bytestring      == 0.9.*,
                               containers      == 0.2.*,
-                              value-supply    == 0.5.*
+                              value-supply    == 0.5.*,
+                              transformers    == 0.1.*,
+                              monads-fd       == 0.0.*
   GHC-Options:                -Wall
   Exposed-Modules:            
                               RPL.Names

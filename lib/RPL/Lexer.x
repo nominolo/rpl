@@ -83,7 +83,7 @@ data LexState = LexState
 -- | Set the location of the last token.  This is used as the position in
 -- case of a parse error.
 setLastLoc :: SrcSpan -> ParseM ()
-setLastLoc span = modifyState $ \s -> s { lex_last_loc = span }
+setLastLoc span = modify $ \s -> s { lex_last_loc = span }
 
 -- ** The interface for Alex
 
@@ -109,12 +109,12 @@ alexGetChar (AI p o _ bs) =
 -- * Our utils
 
 getInput :: ParseM AlexInput
-getInput = do s <- getState
+getInput = do s <- get
               return (AI (lex_pos s) (lex_offs s) (lex_chr s) (lex_inp s))
 
 setInput :: AlexInput -> ParseM ()
 setInput (AI p o c bs) = do
-    modifyState (\s -> s { lex_pos = p, lex_chr = c, lex_inp = bs, lex_offs = o })
+    modify (\s -> s { lex_pos = p, lex_chr = c, lex_inp = bs, lex_offs = o })
                        
 getLexState :: ParseM Int
 getLexState = gets lex_scd
@@ -151,7 +151,7 @@ lexer cont = do
 runParseM :: ParseM a 
         -> UTF8.ByteString -> SrcLoc 
         -> Either SourceError a
-runParseM m buf loc = unSSEM m (\_ -> Right) Left initState
+runParseM m buf loc = runStrictStateErrorM m initState
   where
     initState = LexState loc buf 0 '\n' 0 noSrcSpan
 
@@ -162,7 +162,7 @@ runParseM m buf loc = unSSEM m (\_ -> Right) Left initState
 -- the partial result could be extracted even in the case of an error.
 lexTokenStream :: UTF8.ByteString -> SrcLoc 
                -> Either SourceError [Located Token]
-lexTokenStream buf loc = unSSEM go (\_ -> Right) Left initState
+lexTokenStream buf loc = runStrictStateErrorM go initState
   where
     initState = LexState loc buf 0 '\n' 0 noSrcSpan
     go = do
@@ -173,7 +173,7 @@ lexTokenStream buf loc = unSSEM go (\_ -> Right) Left initState
 
 parseFail :: ParseM a
 parseFail = do
-    s <- getState
+    s <- get
     parseMError (lex_last_loc s) ParseError
 
 -- | The token type

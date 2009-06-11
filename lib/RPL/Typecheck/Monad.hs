@@ -32,13 +32,13 @@ instance IdGen TcM where genId = tcGenId
 
 tcGenId :: String -> TcM Id
 tcGenId disp_name =
-    do (i, m) <- TcM getState
+    do (i, m) <- TcM get
        let i' = i + 1
        let (n, m') = case M.lookup disp_name m of
              Nothing -> (disp_name, M.insert disp_name 1 m)
              Just o -> (disp_name ++ "_" ++ show o,
                         M.update (Just . (1+)) disp_name m)
-       i' `seq` m' `seq` TcM (setState (i', m'))
+       i' `seq` m' `seq` TcM (put (i', m'))
        return $ Id (uniqueFromInt i) n
 
 tcError :: SrcSpan -> ErrorMessage -> TcM a
