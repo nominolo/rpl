@@ -12,6 +12,8 @@ import Control.Applicative
 import Control.Monad.State.Class
 import Control.Monad.Error.Class
 
+-- * 'StrictStateErrorM' Monad
+
 newtype StrictStateErrorM s e a
   = SSEM { unSSEM :: forall r.
                      (s -> a -> r)
@@ -46,6 +48,7 @@ instance MonadError e (StrictStateErrorM s e) where
     SSEM $ \k e s -> unSSEM m k (\err -> unSSEM (h err) k e s) s
 
 ------------------------------------------------------------------------
+-- * 'StrictStateErrorM' Monad Transformer
 
 newtype StrictStateErrorT s e m a
   = SSET { unSSET :: forall r.
@@ -55,9 +58,9 @@ newtype StrictStateErrorT s e m a
                   -> m r 
          }
 
-runStrictStateErrorT :: Monad m => StrictStateErrorT s e m a -> s -> m (Either e a)
+runStrictStateErrorT :: Monad m => StrictStateErrorT s e m a -> s -> m (Either e (a, s))
 runStrictStateErrorT m s0 =
-  unSSET m (\_s a -> return $ Right a) (return . Left) s0
+  unSSET m (\s a -> return $ Right (a, s)) (return . Left) s0
 
 instance Functor m => Functor (StrictStateErrorT s e m) where
   fmap f m = SSET $ \k e s -> unSSET m (\s' a -> k s' (f a)) e s
