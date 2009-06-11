@@ -46,6 +46,7 @@ Library
                               RPL.Typecheck.HMX
                               RPL.Typecheck.HMX.Core
                               RPL.Typecheck.HMX.Constraint
+                              RPL.Typecheck.HMX.Unify
                               RPL.Utils.Misc
                               RPL.Utils.Monads
                               RPL.Utils.Panic

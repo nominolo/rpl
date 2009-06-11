@@ -42,7 +42,7 @@ $(DIST)/lib/setup-config: $(SETUP) lib/rpl.cabal
 
 $(DIST)/lib/build/libHSrpl-0.1.a: $(DIST)/lib/setup-config \
                                   lib/**/*.hs lib/**/*.x lib/**/*.y \
-	                          lib/**/**/*.hs
+	                          lib/**/**/*.hs lib/**/**/**/*.hs
 	@echo === Building library =====================================
 	@cd lib && \
 	../$(SETUP) build --builddir=../$(DIST)/lib $(CABAL_FLAGS)

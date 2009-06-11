@@ -32,7 +32,6 @@ import Prelude hiding ( foldr )
 import RPL.Typecheck.HMX.Core
 import RPL.Utils.UnionFind as UF
 import RPL.Utils.Pretty
-import RPL.Utils.Misc ( ifM )
 import RPL.Utils.SrcLoc
 
 import Data.Maybe ( isJust, fromMaybe )
@@ -221,117 +220,6 @@ introduce v pool@(MkPool r _) = do
   return $ register v pool
 
 ------------------------------------------------------------------------
-
--- | The result of unification; isomorphic to 'Maybe'.
-data UnifyResult
-    = Success
-    | CannotUnify SrcSpan (ArTerm Var) (ArTerm Var)
-
-instance Pretty UnifyResult where
-  ppr Success = text "success"
-  ppr (CannotUnify _ t1 t2) =
-      text "Could not unify:" $+$
-      nest 4 (ppr t1) $+$
-      nest 4 (ppr t2)
-
--- Helper 
-thenUnify :: IO UnifyResult -> IO UnifyResult -> IO UnifyResult
-thenUnify m m' = do
-  r <- m; case r of Success -> m'; _ -> return r
-
--- | Join the multi-equations associated with the two variables.
-unifyVar :: SrcSpan -> Var -> Var -> IO UnifyResult
-unifyVar pos0 var0_1 var0_2 = unify pos0 var0_1 var0_2
-  where
-    unify pos var1 var2 =
-      ifM (not <$> UF.equivalent var1 var2)
-        (unify' pos var1 var2)
-        (return Success)
-
-    unify' pos var1 var2 = do
-      desc1 <- descriptor var1
-      desc2 <- descriptor var2
-      let new_kind 
-            | is_rigid desc1 = descKind desc1
-            | is_rigid desc2 = descKind desc2
-            | otherwise      = Flexible
-      let new_name =
-              case (descName desc1, descName desc2) of
-                (Just n1, Just n2)
-                  | n1 /= n2 ->
-                      if is_rigid desc1 then Just n1 else
-                       if is_rigid desc2 then Just n2
-                        else Nothing
-                  | otherwise ->
-                      Just n1
-                (Just n, _) -> Just n
-                (_, Just n) -> Just n
-                _ -> Nothing
-      let lower1 = descRank desc1 < descRank desc2
-
-      -- merge1: Merge two multi-equations but keep the structure of the first
-      -- merge2: Merge two multi-equations but keep the structure of the first
-      let merge1 
-           | lower1 = do
-               UF.union var2 var1
-               modifyDescriptor var1 $ \d -> d { descKind = new_kind
-                                               , descName = new_name }
-               return Success
-           | otherwise = do
-               UF.union var1 var2
-               modifyDescriptor var2 $ \d -> d { descKind = new_kind
-                                               , descName = new_name
-                                               , descStruct = descStruct desc1 }
-               return Success
-      let merge2
-           | lower1 = do
-               UF.union var2 var1
-               modifyDescriptor var1 $ \d -> d { descKind = new_kind
-                                               , descName = new_name
-                                               , descStruct = descStruct desc2 }
-               return Success
-           | otherwise = do
-               UF.union var1 var2
-               modifyDescriptor var2 $ \d -> d { descKind = new_kind
-                                               , descName = new_name }
-               return Success
-      let merge | lower1    = merge1
-                | otherwise = merge2
-                 
-      let fresh :: Maybe Structure -> IO Var
-          fresh s = do
-            UF.fresh (MkDescr
-                      { descStruct = s
-                      , descRank = descRank (if lower1 then desc1 else desc2)
-                      , descMark = noMark
-                      , descKind = new_kind
-                      , descName = new_name
-                      , descPos = noSrcSpan
-                      , descVar = Nothing
-                      })
-
-      let filt v term = unify pos v =<< fresh (Just term)
-
-      case (descStruct desc1, descStruct desc2) of
-        -- neither multi-equation contains a term
-        (Nothing, Nothing) | is_flexible desc1 && is_flexible desc2 -> merge
-        (Nothing, _)       | is_flexible desc1                      -> merge2
-        (_, Nothing)       | is_flexible desc2                      -> merge1
-
-        -- exactly one multi-equation contains a term; keep that one
-        (Just (Var v), _) -> unify pos v var2
-        (_, Just (Var v)) -> unify pos v var1
-
-        -- it's forbidden to unify rigid type variables with a structure
-        (Nothing, _) -> -- var1 is rigid
-          return $ CannotUnify pos (TVar var1) (TVar var2)
-        (_, Nothing) -> -- var2 is rigid
-          return $ CannotUnify pos (TVar var1) (TVar var2)
-        
-        -- We're trying to unify two compound terms.
-        (Just (App l1 r1), Just (App l2 r2)) -> do
-          merge
-          unify pos l1 l2 `thenUnify` unify pos r1 r2
 
 
 chop :: Pool -> CrTerm -> IO (Pool, Var)
