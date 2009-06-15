@@ -62,9 +62,9 @@ outermost = IntRank 0
 ------------------------------------------------------------------------
 
 -- * XXX: define these
-type Mark = ()
+type Mark = Int
 noMark :: Mark
-noMark = ()
+noMark = (-1)
 
 newtype TName = TName String deriving (Eq, Ord)
 
