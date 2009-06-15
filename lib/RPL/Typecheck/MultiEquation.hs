@@ -41,14 +41,17 @@ import Data.Foldable
 import Data.Traversable
 import qualified Data.Set as S
 import qualified Data.Map as M
+import Data.Array ( Ix )
 
 ------------------------------------------------------------------------
 
 -- * IntRank
 
-newtype IntRank = IntRank Int deriving (Eq, Ord, Show, Num)
+newtype IntRank = IntRank Int deriving (Eq, Ord, Show, Num, Ix, Enum)
 
-instance Pretty IntRank where ppr (IntRank n) = int n
+instance Pretty IntRank where
+    ppr r@(IntRank n) | r == noRank = char '#'
+                      | otherwise   = int n
 
 noRank :: IntRank
 noRank = IntRank (-1)
@@ -104,6 +107,9 @@ data Descriptor = MkDescr
   , descVar    :: Maybe Var
   }
 
+instance Show Descriptor where show = pretty
+instance (Pretty a) => Show (Point a) where show = pretty
+
 -- | The structure of a descriptor.  See 'Descriptor'.
 type Structure = Term Var
 
@@ -121,7 +127,8 @@ instance Pretty VarKind where
 
 instance Pretty Descriptor where
   ppr d =
-      ppr (descKind d) <> 
+      ppr (descKind d) <>
+      ppr (descRank d) <>
       (case descStruct d of
         Just s -> ppr s
         Nothing -> ppr (fromMaybe (TName "_") (descName d)))
@@ -200,6 +207,9 @@ data Pool = MkPool
   { poolRank :: {-# UNPACK #-} !IntRank
   , poolVars :: [Var]
   }
+
+instance Pretty Pool where
+  ppr (MkPool r vs) = braces $ text "pool" <> parens (ppr r) <+> ppr vs
 
 initialPool :: Pool
 initialPool = MkPool outermost []

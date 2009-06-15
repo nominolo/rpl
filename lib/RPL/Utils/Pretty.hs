@@ -189,7 +189,7 @@ commaSep = punctuate comma
 
 ------------------------------------------------------------------------
 -- * Prelude Type Instances
-
+instance Pretty PDoc where ppr = id
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
   ppr (Left a) = ppr a
   ppr (Right b) = ppr b
