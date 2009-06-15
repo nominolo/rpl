@@ -13,9 +13,9 @@ import qualified Data.Set as S
 
 ------------------------------------------------------------------------
 
-newtype SchemeName = SName Id
+newtype SchemeName = SName { unSName :: String }
 
-instance Pretty SchemeName where ppr (SName n) = ppr n
+instance Pretty SchemeName where ppr (SName n) = text n
 
 data Constraint term var
   = CTrue SrcSpan
