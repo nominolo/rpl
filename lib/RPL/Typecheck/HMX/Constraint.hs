@@ -8,6 +8,7 @@ import RPL.Names
 import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
 
+import Control.Applicative hiding ( empty )
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -90,6 +91,13 @@ ex vs c = Let [ForAll noSrcSpan [] vs c M.empty] (CTrue noSrcSpan)
 --
 forAll :: [Var] -> TConstraint -> TConstraint
 forAll vs c = Let [ForAll noSrcSpan vs [] c M.empty] (CTrue noSrcSpan)
+
+-- | @defName n f@ builds the constraint @forall n [f n]. True@.  This
+-- can be used to introduce new type names into the scope.
+defName :: String -> (CrTerm -> IO TConstraint) -> IO TConstraint
+defName n f = do
+  var <- mkVar Constant n
+  forAll [var] <$> f (TVar var)
 
 -- | @exists f@ Creates a fresh variable @x@ and returns the constraint
 --
