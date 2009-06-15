@@ -213,7 +213,6 @@ instance Pretty s => Pretty (Set s) where
 
 instance Pretty a => Pretty [a] where
   ppr l = brackets (fsep (punctuate comma (map ppr l)))
-
 instance (Pretty k, Pretty a) => Pretty (Map k a) where
   ppr s = braces (fsep (punctuate comma (map ppr_elem (M.toList s))))
     where ppr_elem (k, v) = ppr k <> colon <+> ppr v

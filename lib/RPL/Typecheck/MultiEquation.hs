@@ -222,6 +222,9 @@ newPool (MkPool r _) = MkPool (r + 1) []
 register :: Var -> Pool -> Pool
 register v (MkPool r vs) = MkPool r (v:vs)
 
+registerVars :: [Var] -> Pool -> Pool
+registerVars vs (MkPool r vs') = MkPool r (vs ++ vs')
+
 -- | Add variable to the pool and set the variables rank to the same as the
 -- pool.
 introduce :: Var -> Pool -> IO Pool
