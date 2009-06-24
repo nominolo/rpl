@@ -35,7 +35,7 @@ fromUserType ty = do
       Syn.TCon _ n    -> return $ TyCon (MkTyCon n 0)
       Syn.TApp _ t t' -> (@@) <$> inner t <*> inner t'
       Syn.TFun _ t t' -> (.->.) <$> inner t <*> inner t'
-      Syn.TAll s v t  ->
+      Syn.TAll _s _v _t  ->
           tcError (typeSpan ty) $ WrongUserType $
             wrappingText "User type annotation contains nested foralls:" $$
             text "Full type annotation:" $$
@@ -70,17 +70,17 @@ isInstanceOf' (ForAll tvs1 _ rho1) (ForAll tvs2 _ rho2) = do
     let qualified_vars = S.fromList tvs2
     return $ go subst qualified_vars emptyTySubst rho1 rho2
   where
-    go skolems quals s t1 (TyVar v)
+    go _skolems quals s t1 (TyVar v)
       | v `S.member` quals = 
           case s !! v of
             Nothing -> Just $ s // [(v, t1)]
             Just t' | t' == t1 -> Just s
                     | otherwise -> Nothing
-    go skolems quals s t1@(TyVar _) (TyVar v) =
+    go _skolems _quals s t1@(TyVar _) (TyVar v) =
         Just $ s // [(v, t1)]
     go skolems quals s (TyApp t1 t2) (TyApp u1 u2) =
         do s' <- go skolems quals s t1 u1
            go skolems quals s' t2 u2
-    go skolems quals s (TyCon tc1) (TyCon tc2)
+    go _skolems _quals s (TyCon tc1) (TyCon tc2)
       | tc1 == tc2 = Just s
     go _ _ _ _ _ = Nothing
