@@ -23,7 +23,7 @@
 -- Consequently that future lookups will be have a path length of at most 1.
 --
 module RPL.Utils.UnionFind 
-  ( Point, fresh, repr, union, equivalent, redundant,
+  ( Point, fresh, repr, union, union', equivalent, redundant,
     descriptor, setDescriptor, modifyDescriptor )
 where
 
@@ -112,25 +112,34 @@ modifyDescriptor point f = do
 -- PRE-CONDITION: The input points must not be in the same equivalence
 -- class.
 union :: Point a -> Point a -> IO ()
-union p1 p2 = do
+union p1 p2 = union' p1 p2 (\_ d2 -> return d2)
+
+-- | Like 'union', but sets the descriptor returned from the callback.
+--
+-- The intention is to keep the descriptor of the second argument to the
+-- callback, but the callback might adjust the information of the descriptor
+-- or perform side effects.
+union' :: Point a -> Point a -> (a -> a -> IO a) -> IO ()
+union' p1 p2 update = do
   point1@(Pt link_ref1) <- repr p1
   point2@(Pt link_ref2) <- repr p2
   -- The precondition ensures that we don't create cyclic structures.
   assert (point1 /= point2) $ do
   Info info_ref1 <- readIORef link_ref1
   Info info_ref2 <- readIORef link_ref2
-  MkInfo w1 _d1 <- readIORef info_ref1 -- d1 is discarded
+  MkInfo w1 d1 <- readIORef info_ref1 -- d1 is discarded
   MkInfo w2 d2 <- readIORef info_ref2
+  d2' <- update d1 d2
   -- Make the smaller tree a a subtree of the bigger one.  The idea is this: We
   -- increase the path length of one set by one.  Assuming all elements are
   -- accessed equally often, this means the penalty is smaller if we do it
   -- for the smaller set of the two.
   if w1 >= w2 then do
     writeIORef link_ref2 (Link point1)
-    writeIORef info_ref1 (MkInfo (w1 + w2) d2)
+    writeIORef info_ref1 (MkInfo (w1 + w2) d2')
    else do
     writeIORef link_ref1 (Link point2)
-    writeIORef info_ref2 (MkInfo (w1 + w2) d2)
+    writeIORef info_ref2 (MkInfo (w1 + w2) d2')
 
 -- | /O(1)/. Return @True@ if both points belong to the same equivalence class.
 equivalent :: Point a -> Point a -> IO Bool
