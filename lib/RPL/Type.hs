@@ -32,6 +32,7 @@ data Type
   = TyVar TyVar
   | TyCon TyCon
   | TyApp Type Type
+  | TyAll TyVar Type
   deriving (Eq, Ord, Show)
 
 data TyCon = MkTyCon 
@@ -87,7 +88,8 @@ mkForall vs c t = ForAll vs c t
 -- This class is used to allow writing a 'TyVar' where a 'Type' is expected.
 -- 
 class ToType a       where toType :: a -> Type
-instance ToType Type  where toType = id
+instance ToType Type
+  where toType = id
 instance ToType TyVar where toType = TyVar
 instance ToType TyCon where toType = TyCon
 
@@ -173,6 +175,7 @@ ppr_parens False d = d
 ppr_type' :: Int -> Type -> PDoc
 ppr_type' _ (TyVar v) = ppr v
 ppr_type' _ (TyCon c) = ppr c
+ppr_type' d (TyAll v t) = ppr_parens (d > 0) $ ppr_forall [v] t
 ppr_type' d (TyApp (TyApp (TyCon c) t) t')
   | isInfixTyCon c =
       let prec = infixTyConPrecedence c
@@ -185,6 +188,12 @@ ppr_type' d (TyApp (TyApp (TyCon c) t) t')
         ppr_type' prec_left t <+> ppr c <+> ppr_type' prec_right t'
 ppr_type' d (TyApp t t') =
     ppr_parens (d > 100) $ ppr_type' 100 t <+> ppr_type' 101 t'
+
+ppr_forall :: [TyVar] -> Type -> PDoc
+ppr_forall vs (TyAll v t) = ppr_forall (v:vs) t
+ppr_forall vs t =
+    text "forall" <+> sep (map ppr (reverse vs)) <> char '.' <+>
+    nest 2 (ppr_type' 0 t)
 
 -- | `True <=>` type constructor should be written infix instead of prefix.
 isInfixTyCon :: TyCon -> Bool
