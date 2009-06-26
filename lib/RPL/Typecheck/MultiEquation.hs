@@ -38,7 +38,6 @@ import Data.Maybe ( isJust, fromMaybe )
 import Control.Applicative
 import System.IO.Unsafe ( unsafePerformIO ) -- for pretty printing IORef contents
 import Data.Foldable
-import Data.Traversable
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Array ( Ix )
@@ -236,7 +235,7 @@ introduce v pool@(MkPool r _) = do
 
 
 chop :: Pool -> CrTerm -> IO (Pool, Var)
-chop pool@(MkPool r vs0) term = do
+chop (MkPool r vs0) term = do
     (vs, v) <- go [] term
     return (MkPool r (vs ++ vs0), v)
   where
