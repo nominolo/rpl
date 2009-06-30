@@ -5,7 +5,7 @@ module RPL.Type
   , -- * Type Constructors
     isInfixTyCon, tyConApp, TyCon(..), (@@)
     -- * Type Variables
-  , TyVar, tyVarId, mkTyVar, mkSkolem
+  , TyVar, tyVarId, mkTyVar, mkSkolem, funTyCon
     -- * Constraints
   , Constraint, Constraints, (===), (/\)
     -- * Type Schemes
