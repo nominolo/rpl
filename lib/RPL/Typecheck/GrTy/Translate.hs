@@ -73,7 +73,7 @@ inst_elim_mono e@ConstrEdge{ cedge_type = Unify } = return e
 inst_elim_mono e@ConstrEdge{ cedge_from = f, cedge_to = d } = do
   [n] <- nodeChildren f
   -- ifM (n `isBoundAt` f)
-  ifM (nodesEqual f =<< nodeBinder n)
+  ifM (nodesEqual f =<< binderNode n)
     (return e)
     (do decrForallCount f
         return (ConstrEdge { cedge_type = Unify
@@ -196,7 +196,7 @@ dumpConstraints st = do
  where
     ppNode n = do
       i <- nodeId n
-      s <- nodeSort <$> nodeInfo n
+      s <- nodeSort n
       cis <- mapM nodeId =<< nodeChildren n
       return (ppSort s ++ "_" ++ show i ++ " -> " ++ show cis)
     
@@ -246,10 +246,10 @@ dottyConstraints cs = do
     footer = "}\n"
     ppNode n = do
       i <- nodeId n
-      s <- nodeSort <$> nodeInfo n
+      s <- nodeSort n
       r <- isRoot n
       ch <- mapM nodeId =<< nodeChildren n
-      bdr <- get_binder n
+      bdr <- getBinder n
       bind_edge
         <- (case bdr of
               Root -> return []

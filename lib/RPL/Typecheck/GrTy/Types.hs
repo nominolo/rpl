@@ -1,7 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
-module RPL.Typecheck.GrTy.Types where
+module RPL.Typecheck.GrTy.Types 
+  ( Node, NodeId, Permissions(..), BindingLabel(..), ForallUse, NodeSort(..),
+    Bound(..), BoundInfo(..),
+    newNode, nodeId, nodeSort, nodeArity, nodeChildren,
+    isRoot, setBinder, getBinder, binderNode, 
+    fuse, nodesEqual, 
+    newForallNode, isForall, forallCount, incrForallCount, decrForallCount,
+    bindingHeight,
+    bindFlexiblyTo
+  )
+where
 
 import qualified RPL.Type as Typ
 import qualified RPL.Utils.UnionFind as UF
@@ -37,7 +47,7 @@ modifyRef (GTRef r) f = liftIO $ modifyIORef r f
 
 data Node = Node
   { node_info :: UF.Point NodeInfo
-  , oldStruct :: UF.Point OldStruct
+  , old_struct :: UF.Point OldStruct
   } deriving (Eq)
 
 instance Show Node where
@@ -69,7 +79,7 @@ data NodeSort
 
 data NodeInfo = NodeInfo
   { node_id       :: {-# UNPACK #-} !NodeId
-  , nodeSort      :: NodeSort
+  , node_sort      :: NodeSort
   , node_children  :: [Node] -- TODO: invariant? length == arity?
   , nodeBound     :: GTRef (Bound Node)
   , nodeCanon     :: Node -- ??
@@ -80,7 +90,7 @@ data Bound a = Root | Bound (BoundInfo a) deriving (Eq, Show)
 
 data BoundInfo a = BoundInfo
   { bindLabel       :: {-# UNPACK #-} !BindingLabel
-  , bindBinder          :: a
+  , bindBinder      :: a
   , bindPermissions :: {-# UNPACK #-} !Permissions
   , bindHeight      :: {-# UNPACK #-} !Int
   } deriving (Eq, Show)
@@ -108,21 +118,21 @@ newNode nsort0 children = do
 
   nid <- newNodeId
   let unify_info = UnifyInfo { unifyTag = () }
-  let old_struct = OldStruct
+  let old_struct_ = OldStruct
   node
       <- liftIO $ mfix $ \ n -> do
            bound_ref <- newRef Root
            let node_info' = 
                    NodeInfo { node_id = nid
-                            , nodeSort = nsort
+                            , node_sort = nsort
                             , node_children = children
                             , nodeBound = bound_ref
                             , nodeCanon = n
                             , nodeUnifyInfo = unify_info
                             }
            ni <- UF.fresh node_info'
-           nos <- UF.fresh old_struct
-           let node = Node ni nos
+           nos <- UF.fresh old_struct_
+           let node = Node { node_info = ni, old_struct = nos }
            return node
   return node
 
@@ -134,12 +144,15 @@ nodeInfo (Node ni _) = liftIO $ UF.descriptor ni
 nodeId :: (Applicative m, MonadIO m) => Node -> m Int
 nodeId node = unNodeId . node_id <$> nodeInfo node
 
+nodeSort :: (Applicative m, MonadIO m) => Node -> m NodeSort
+nodeSort node = node_sort <$> nodeInfo node
+
 nodesEqual :: (Applicative m, MonadIO m) => Node -> Node -> m Bool
 nodesEqual n1 n2 = (==) <$> nodeId n1 <*> nodeId n2
 
 nodeArity :: (Applicative m, MonadIO m) => Node -> m Int
 nodeArity node = do
-  nsort <- nodeSort <$> nodeInfo node
+  nsort <- nodeSort node
   return $ case nsort of
              Bot -> 0
              Forall _ -> 1
@@ -152,11 +165,17 @@ setBinder node binfo = do
   ni <- nodeInfo node
   writeRef (nodeBound ni) (Bound binfo)
 
-nodeBinder :: (Applicative m, MonadIO m) => Node -> m Node
-nodeBinder node = do
+getBinder :: (Applicative m, MonadIO m) => Node -> m (Bound Node)
+getBinder node = get_binder node
+
+-- | Returns the node where the given node is bound at.
+--
+-- NOTE: The input node must not be a the root note.
+binderNode :: (Applicative m, MonadIO m) => Node -> m Node
+binderNode node = do
   b <- get_binder node
   case b of
-    Root -> error "nodeBinder of root"
+    Root -> panic (text "nodeBinder of root")
     Bound b' -> return (bindBinder b')
 
 get_binder :: (Applicative m, MonadIO m) => Node -> m (Bound Node)
@@ -167,19 +186,19 @@ set_binder node b' = do
   r <- nodeBound <$> nodeInfo node
   writeRef r b'
 
+-- | Return the node's children.
 nodeChildren :: (Applicative m, MonadIO m) => Node -> m [Node]
 nodeChildren node = node_children <$> nodeInfo node
 
--- | Returns @True@ iff node is a root.
+-- | Returns @True@ iff node is a\/the root.
 isRoot :: (Applicative m, MonadIO m) => Node -> m Bool
 isRoot node = do
-  ni <- nodeInfo node
-  b <- readRef (nodeBound ni)
+  b <- getBinder node
   case b of
     Root -> return True
     _ -> return False
 
-
+-- | Combine two nodes, keeping the information of the first one.
 fuse :: (Applicative m, MonadIO m) => Node -> Node -> m ()
 fuse keep@(Node ni1 os1) (Node ni2 os2) = do
   bound <- get_binder keep
@@ -199,7 +218,7 @@ newForallNode children = do
 
 isForall :: (Applicative m, MonadIO m) => Node -> m Bool
 isForall node = do
-  nsort <- nodeSort <$> nodeInfo node
+  nsort <- nodeSort node
   case nsort of
     Forall _ -> return True
     _ -> return False
@@ -212,7 +231,7 @@ forallCount node = readRef =<< forall_count_ref node
 -- | Return the reference of the forall use counter.
 forall_count_ref :: (Applicative m, MonadIO m) => Node -> m (GTRef Int)
 forall_count_ref node = do
-  nsort <- nodeSort <$> nodeInfo node
+  nsort <- nodeSort node
   case nsort of
     Forall (ForallUse r) -> return r
     _ -> panic (text "forall_count_ref: Node not a forall")
@@ -234,8 +253,7 @@ bindingHeight node = do
 
 bindFlexiblyTo :: (Applicative m, MonadIO m) => Node -> Maybe Node -> m ()
 bindFlexiblyTo node mb_binder = do
-  bind_ref <- nodeBound <$> nodeInfo node
-  writeRef bind_ref =<<
+  set_binder node =<<
     case mb_binder of
       Nothing -> return Root
       Just n' -> do
