@@ -3,7 +3,8 @@ module RPL.Utils.Monads
   ( StrictStateErrorM, runStrictStateErrorM,
     MonadState(..), gets, modify,
     MonadError(..), MonadIO(..),
-    StrictStateErrorT, runStrictStateErrorT
+    StrictStateErrorT, runStrictStateErrorT,
+    MonadGen(..)
   )
 where
 
@@ -11,6 +12,8 @@ import Control.Monad.Trans
 import Control.Applicative
 import Control.Monad.State.Class
 import Control.Monad.Error.Class
+
+import Data.Supply
 
 -- * 'StrictStateErrorM' Monad
 
@@ -88,3 +91,14 @@ instance Monad m => MonadError e (StrictStateErrorT s e m) where
   throwError err = SSET $ \_ e _ -> e err
   catchError m h =
     SSET $ \k e s -> unSSET m k (\err -> unSSET (h err) k e s) s
+
+class Monad m => MonadGen s m where
+  getSupply :: m (Supply s)
+  setSupply :: Supply s -> m ()
+  fresh :: m s
+  fresh = do
+    s <- getSupply
+    let (s', s'') = split2 s
+    setSupply s''
+    return (supplyValue s')
+  
