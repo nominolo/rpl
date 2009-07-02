@@ -27,7 +27,8 @@ Library
                               containers      == 0.2.*,
                               value-supply    == 0.5.*,
                               transformers    == 0.1.*,
-                              monads-fd       == 0.0.*
+                              monads-fd       == 0.0.*,
+                              haxr            == 3000.2.*
   GHC-Options:                -Wall
   Exposed-Modules:            
                               RPL.Names
@@ -58,3 +59,4 @@ Library
                               RPL.Utils.SrcLoc
                               RPL.Utils.Unique
                               RPL.Utils.UnionFind
+                              Graphics.Ubigraph

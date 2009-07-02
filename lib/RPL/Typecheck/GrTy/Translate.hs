@@ -17,9 +17,10 @@ import RPL.Utils.Misc
 import Data.Supply
 import Control.Applicative
 import qualified Data.Map as M
-import Control.Monad ( when, foldM )
+import Control.Monad ( when, foldM, forM_ )
 import Data.Maybe ( isJust )
 import Data.List ( intercalate )
+import Graphics.Ubigraph
 
 data GTMState = GTMState 
   { nextId :: Supply NodeId
@@ -197,14 +198,19 @@ translate ct _env exp0 = do
 t1 :: IO ()
 t1 = do 
   let x = Syn.Id (uniqueFromInt 2) "x"
+  let y = Syn.Id (uniqueFromInt 3) "y"
   let u = noSrcSpan
-  let expr = Syn.ELam u (Syn.VarPat u x) (Syn.EVar u x)
+  let expr = Syn.ELam u (Syn.VarPat u x) $
+             --Syn.ELam u (Syn.VarPat u y) $ 
+             --  Syn.EApp u (Syn.EVar u y) 
+                 (Syn.EApp u (Syn.EVar u x) (Syn.ELit u (Syn.IntLit 1)))
   r <- runGTM $ translate MLF [] expr
   case r of
     Left s -> print s
     Right cs -> do
            dumpConstraints cs
            writeFile "gtdump.dot" =<< dottyConstraints cs
+           ubigraphConstraints cs
   return ()
 
 dumpConstraints :: ConstraintStore -> IO ()
@@ -282,9 +288,11 @@ dottyConstraints cs = do
               Root -> return []
               Bound b -> do
                 b_id <- nodeId (bindBinder b)
+                f <- isForall (bindBinder b)
                 return $ 
-                  ["\t" ++ show i ++ " -> " ++ show b_id
-                        ++ " [constraint=false, style=" ++ 
+                  ["\t" ++ show b_id ++ " -> " ++ show i
+                        ++ " [dir=back, constraint=" ++ (if f then "true" else "false") 
+                        ++ ", style=" ++ 
                         (case bindLabel b of
                            Flex -> "dotted"
                            Rigid -> "dashed") ++ "];"])
@@ -292,14 +300,72 @@ dottyConstraints cs = do
          [ "\t" ++ show i ++ " [label=" ++ show (ppSort s) ++ 
            (if r then ",shape=doublecircle" else "") 
            ++ "];" ] ++ 
-         [ "\t" ++ show i ++ " -> " ++ show c ++ ";" | c <- ch ]
+         [ "\t" ++ show i ++ " -> " ++ show c ++ " [label=" ++ show (show m) ++ "];" 
+            | (c,m) <- zip ch [(1::Int)..] ]
          ++ bind_edge
 
     ppEdge e = do
       n1 <- nodeId (cedge_from e)
       n2 <- nodeId (cedge_to e)
-      return $ "\t" ++ show n1 ++ " -> " ++ show n2 ++ " [constraint=true," ++ 
+      return $ "\t" ++ show n1 ++ " -> " ++ show n2 ++ " [constraint=false," ++ 
                (case cedge_type e of
                   Unify -> "arrowhead=none, color=green"
                   Inst -> "color=red")
                ++ "];" 
+
+ubigraphConstraints :: ConstraintStore -> IO ()
+ubigraphConstraints cstore = do
+   clear defaultServer
+   nodes <- trans_close (cstore_root cstore : cstore_existentials cstore) M.empty
+   mapM_ (uncurry mkVertex) (M.toList nodes)
+   mapM_ (uncurry ppNode) (M.toList nodes)
+   mapM_ ppEdge (cstore_constraints cstore)
+   return ()
+  where
+    mkVertex nid node = do
+      newVertexWithId defaultServer nid
+      nsort <- nodeSort node
+      case nsort of
+        TyConNode tc -> do
+          setVertexAttribute defaultServer nid "color" "#8888ff"
+          setVertexAttribute defaultServer nid "shape" "cube"
+          setVertexAttribute defaultServer nid "label" (ppSort nsort)
+        TypeNode _ -> 
+          setVertexAttribute defaultServer nid "color" "#0000ff"
+        Bot -> do
+          setVertexAttribute defaultServer nid "color" "#ff0000"
+          setVertexAttribute defaultServer nid "shape" "sphere"
+        Forall _ -> do
+          setVertexAttribute defaultServer nid "color" "#008800"
+          setVertexAttribute defaultServer nid "shape" "cube"
+          r <- isRoot node
+          if r then setVertexAttribute defaultServer nid "size" "2.0" else return True
+ 
+    ppNode nid node = do
+      ch <- mapM nodeId =<< nodeChildren node
+      forM_ ch $ \child_id -> do
+        e <- newEdge defaultServer nid child_id
+        setEdgeAttribute defaultServer e "color" "#ffffff"
+        setEdgeAttribute defaultServer e "oriented" "true"
+        return ()
+      bdr <- getBinder node
+      case bdr of
+        Root -> return ()
+        Bound b -> do
+          b_id <- nodeId (bindBinder b)
+          e <- newEdge defaultServer b_id nid
+          setEdgeAttribute defaultServer e "color" "#008800"
+          setEdgeAttribute defaultServer e "strength" "0.3"
+          setEdgeAttribute defaultServer e "oriented" "true"
+          return ()
+                 
+    ppEdge e = do
+      n1 <- nodeId (cedge_from e)
+      n2 <- nodeId (cedge_to e)
+      ue <- newEdge defaultServer n1 n2
+      setEdgeAttribute defaultServer ue "width" "3"
+      setEdgeAttribute defaultServer ue "strength" "0.1"
+      case cedge_type e of
+        Unify -> setEdgeAttribute defaultServer ue "color" "#00ff00"
+        Inst -> setEdgeAttribute defaultServer ue "color" "#ff0000"
+      return ()
