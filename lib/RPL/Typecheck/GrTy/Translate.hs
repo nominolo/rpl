@@ -5,6 +5,7 @@ module RPL.Typecheck.GrTy.Translate where
 import RPL.Typecheck.GrTy.Types
 import RPL.Typecheck.GrTy.Constraint
 import qualified RPL.Type as Typ
+import qualified RPL.BuiltIn as Typ
 import qualified RPL.Syntax as Syn
 import qualified RPL.Names as Syn
 import RPL.Utils.Unique
@@ -38,7 +39,6 @@ runGTM :: GTM a -> IO (Either String a)
 runGTM (GTM m) = do
   nids <- newNumSupply
   fmap fst <$> runStrictStateErrorT m (GTMState nids [] [] [])
-
 
 ------------------------------------------------------------------------
 
@@ -166,6 +166,33 @@ translate ct _env exp0 = do
           f_body <- create_forall vars' fbind f body
           constrain f_body res ()
           return arr
+
+        Syn.EApp _ e1 e2 -> do
+          arg <- new_bound_node Bot []
+          res <- new_bound_node Bot []
+          arr <- new_bound_node (TyConNode Typ.funTyCon) [arg, res]
+          exists_ arr
+          
+          ffun <- create_forall vars fbind f e1
+          farg <- create_forall vars fbind f e2
+
+          constrain farg arg ()
+          constrain ffun arr ()
+
+          return res
+
+        Syn.ELit _ l -> do
+          let t = case l of
+                    Syn.IntLit _ -> Typ.typeInt
+                    Syn.CharLit _ -> Typ.typeChar
+          new_bound_node (TyConNode t) []
+
+        Syn.ELet _ (Syn.VarPat _ v) e1 e2 -> do
+          f1 <- create_real_forall vars (Just f) e1
+          let vars' = M.insert v f1 vars
+          f2 <- translate_ vars' fbind f e2
+          -- add l_expr_roots f1 (loc v)
+          return f2
 
 t1 :: IO ()
 t1 = do 
