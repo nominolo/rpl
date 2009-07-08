@@ -2,14 +2,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 module RPL.Typecheck.GrTy.Types 
-  ( Node, NodeId, Permissions(..), BindingLabel(..), ForallUse, NodeSort(..),
-    Bound(..), BoundInfo(..),
+  ( Node(node_info), NodeId, Permissions(..), BindingLabel(..), ForallUse, NodeSort(..),
+    Bound(..), BoundInfo(..), 
+    NodeInfo(node_id, node_sort, node_children, nodeUnifyInfo, nodeBound),
+    UnifyInfo(..), HistTree(..),
     newNode, nodeId, nodeSort, nodeArity, nodeChildren,
     isRoot, setBinder, getBinder, binderNode, 
     fuse, nodesEqual, 
     newForallNode, isForall, forallCount, incrForallCount, decrForallCount,
     bindingHeight,
-    bindFlexiblyTo
+    bindFlexiblyTo, bindTo,
+    GTRef, newRef, readRef, writeRef, modifyRef,
+    permissions_syst
   )
 where
 
@@ -22,6 +26,8 @@ import RPL.Utils.Pretty
 import Control.Applicative
 import Data.IORef
 import Control.Monad.Fix
+import Data.Maybe ( fromMaybe )
+import Data.Unique
 
 import System.IO.Unsafe ( unsafePerformIO )
 
@@ -43,7 +49,8 @@ writeRef :: MonadIO m => GTRef a -> a -> m ()
 writeRef (GTRef r) x' = liftIO $ writeIORef r x'
 
 modifyRef :: MonadIO m => GTRef a -> (a -> a) -> m ()
-modifyRef (GTRef r) f = liftIO $ modifyIORef r f
+modifyRef (GTRef r) f = liftIO $ do x <- readIORef r
+                                    writeIORef r $! f x
 
 data Node = Node
   { node_info :: UF.Point NodeInfo
@@ -83,7 +90,7 @@ data NodeInfo = NodeInfo
   , node_children  :: [Node] -- TODO: invariant? length == arity?
   , nodeBound     :: GTRef (Bound Node)
   , nodeCanon     :: Node -- ??
-  , nodeUnifyInfo :: UnifyInfo
+  , nodeUnifyInfo :: GTRef UnifyInfo
   } deriving (Eq, Show)
 
 data Bound a = Root | Bound (BoundInfo a) deriving (Eq, Show)
@@ -96,10 +103,25 @@ data BoundInfo a = BoundInfo
   } deriving (Eq, Show)
 
 data UnifyInfo = UnifyInfo
-  { unifyTag :: () -- TODO:
+  { unifyTag :: !Unique
+  , unifiedNodes :: HistTree
+  , unifyBotNonBot :: {-# UNPACK #-} !Bool
+  , unifyMergeHappened :: {-# UNPACK #-} !Bool
   } deriving (Eq, Show)
 
+data HistTree 
+  = Empty 
+  | Leaf {-# UNPACK #-} !NodeId
+         (Bound Node)
+  | Branch HistTree HistTree
+  deriving (Eq, Show)
+
+instance Show Unique where show u = "u<" ++ show (hashUnique u) ++ ">"
+
 data OldStruct = OldStruct deriving (Eq, Show)
+
+dummyTag :: Unique
+dummyTag = unsafePerformIO $ newUnique
 
 newNodeId :: MonadGen NodeId m => m NodeId
 newNodeId = fresh
@@ -117,7 +139,11 @@ newNode nsort0 children = do
              _ -> return nsort0
 
   nid <- newNodeId
-  let unify_info = UnifyInfo { unifyTag = () }
+  unify_info <- newRef $ UnifyInfo 
+                  { unifyTag = dummyTag
+                  , unifiedNodes = Empty
+                  , unifyBotNonBot = False
+                  , unifyMergeHappened = False }
   let old_struct_ = OldStruct
   node
       <- liftIO $ mfix $ \ n -> do
@@ -199,9 +225,9 @@ isRoot node = do
     _ -> return False
 
 -- | Combine two nodes, keeping the information of the first one.
-fuse :: (Applicative m, MonadIO m) => Node -> Node -> m ()
-fuse keep@(Node ni1 os1) (Node ni2 os2) = do
-  bound <- get_binder keep
+fuse :: (Applicative m, MonadIO m) => Node -> Node -> Maybe Node -> m ()
+fuse keep@(Node ni1 os1) (Node ni2 os2) mb_bound = do
+  bound <- get_binder (fromMaybe keep mb_bound)
   liftIO $ UF.union ni2 ni1
   set_binder keep bound
   liftIO $ UF.union os2 os1
@@ -251,6 +277,13 @@ bindingHeight node = do
     Root -> return 0
     Bound binfo -> return (bindHeight binfo)
 
+nodePermissions :: (Applicative m, MonadIO m) => Node -> m Permissions
+nodePermissions node = do
+   bdr <- get_binder node
+   case bdr of
+     Bound b -> return (bindPermissions b)
+     Root -> return FlexPerm
+
 bindFlexiblyTo :: (Applicative m, MonadIO m) => Node -> Maybe Node -> m ()
 bindFlexiblyTo node mb_binder = do
   set_binder node =<<
@@ -263,3 +296,26 @@ bindFlexiblyTo node mb_binder = do
                                   , bindPermissions = FlexPerm
                                   , bindHeight = height' + 1
                                   })
+
+bindTo :: (Applicative m, MonadIO m) => 
+          Node -> Maybe Node -> BindingLabel -> m ()
+bindTo node mb_binder label = do
+  set_binder node =<<
+    case mb_binder of
+      Nothing -> return Root
+      Just n' -> do
+        height' <- bindingHeight n'
+        p' <- nodePermissions n'
+        return $ Bound $ BoundInfo 
+          { bindLabel = label
+          , bindBinder = n'
+          , bindPermissions = permissions_syst p' label
+          , bindHeight = height' + 1
+          }
+        
+-- | Calculate child permission based on parent permission and label.
+permissions_syst :: Permissions -> BindingLabel -> Permissions
+permissions_syst parent_perm label =
+  case label of
+    Rigid -> RigidPerm
+    Flex -> if parent_perm == FlexPerm then FlexPerm else LockedPerm

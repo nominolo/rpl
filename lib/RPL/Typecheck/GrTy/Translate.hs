@@ -19,7 +19,7 @@ import Control.Applicative
 import qualified Data.Map as M
 import Control.Monad ( when, foldM, forM_ )
 import Data.Maybe ( isJust )
-import Data.List ( intercalate )
+import Data.List ( intercalate, find )
 import Graphics.Ubigraph
 
 data GTMState = GTMState 
@@ -58,8 +58,6 @@ copyConstraints cstore dest = do
         (return e)
 
     copied n = not <$> nodesEqual (dest n) n
-
-data ConstrType = MLF | ML
 
 type Env = [()]
 
@@ -123,7 +121,7 @@ translate ct _env exp0 = do
       when (isJust mb_f) $
         exists_ f'
       n <- translate_ vars f' f' e
-      fuse n b
+      fuse n b Nothing
       return f'
 
     create_forall vars fbind f e = do
@@ -136,7 +134,7 @@ translate ct _env exp0 = do
                      MLF -> f'
                      ML -> fbind
       r <- translate_ vars bndr f' e
-      fuse r b
+      fuse r b Nothing
       return f'
    
     -- f is the current forall for the shape of the constraint
@@ -200,22 +198,38 @@ t1 = do
   let x = Syn.Id (uniqueFromInt 2) "x"
   let y = Syn.Id (uniqueFromInt 3) "y"
   let u = noSrcSpan
-  let expr = Syn.ELam u (Syn.VarPat u x) $
-             --Syn.ELam u (Syn.VarPat u y) $ 
-             --  Syn.EApp u (Syn.EVar u y) 
+  let expr = Syn.ELam u (Syn.VarPat u x) $ --(Syn.EVar u x)
+             Syn.ELam u (Syn.VarPat u y) $ 
+              Syn.EApp u (Syn.EVar u y) 
                  (Syn.EApp u (Syn.EVar u x) (Syn.ELit u (Syn.IntLit 1)))
-  r <- runGTM $ translate MLF [] expr
-  case r of
-    Left s -> print s
-    Right cs -> do
+  r <- runGTM $ do 
+         cs <- translate MLF [] expr
+         liftIO $ do 
            dumpConstraints cs
            writeFile "gtdump.dot" =<< dottyConstraints cs
            ubigraphConstraints cs
+--          let cb msg n = do nid <- nodeId n; print (msg, nid)
+--          dfs_interior nodeChildren (cb "frontier") (cb "pre") (cb "post")
+--                       (cstore_root cs)
+         let Just inst_edge = find ((Inst==) . cedge_type) (cstore_constraints cs)
+         (cs',n1') <- expandForall cs MLF inst_edge
+         liftIO $ do 
+           dumpConstraints cs'
+           writeFile "gtdump1.dot" =<< dottyConstraints cs'
+         return ()
+      
+  case r of
+    Left s -> print s
+    Right _ -> return ()
   return ()
 
 dumpConstraints :: ConstraintStore -> IO ()
 dumpConstraints st = do
    r_id <- nodeId (cstore_root st)
+   
+--    nodes <- trans_close (cstore_root st : cstore_existentials st) M.empty
+--    putStrLn . ("All: "++) . intercalate ", " =<< mapM ppNode (M.elems nodes)
+
    putStrLn . ("Root: " ++) =<< ppNode (cstore_root st)
    ns0 <- M.fromList <$> mapM (\n -> do i <- nodeId n; return (i, n))
                              (cstore_existentials st)
@@ -297,7 +311,7 @@ dottyConstraints cs = do
                            Flex -> "dotted"
                            Rigid -> "dashed") ++ "];"])
       return $ unlines $
-         [ "\t" ++ show i ++ " [label=" ++ show (ppSort s) ++ 
+         [ "\t" ++ show i ++ " [label=" ++ show (show i ++ " " ++ ppSort s) ++ 
            (if r then ",shape=doublecircle" else "") 
            ++ "];" ] ++ 
          [ "\t" ++ show i ++ " -> " ++ show c ++ " [label=" ++ show (show m) ++ "];" 

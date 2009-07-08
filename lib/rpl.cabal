@@ -52,6 +52,7 @@ Library
                               RPL.Typecheck.GrTy.Types
                               RPL.Typecheck.GrTy.Constraint
                               RPL.Typecheck.GrTy.Translate
+                              RPL.Typecheck.GrTy.Unify
                               RPL.Utils.Misc
                               RPL.Utils.Monads
                               RPL.Utils.Panic
