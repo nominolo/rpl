@@ -45,6 +45,7 @@ import Data.Unique
 import Data.Maybe ( fromMaybe )
 import Control.Monad ( unless, forM_, foldM, when )
 import Control.Monad.Trans.Cont
+import Control.Exception ( assert )
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as M
@@ -77,6 +78,9 @@ data UnifyError
   | ForbiddenWeaken NodeId [NodeId]
   | ForbiddenMerge NodeId [NodeId]
 
+traceU :: MonadIO m => String -> m ()
+traceU msg = return () --liftIO $ putStrLn msg
+
 unify :: (Applicative m, MonadIO m, MonadError String m) => 
          Env -> Node -> Node -> m ()
 unify env n1 n2 = do
@@ -84,7 +88,9 @@ unify env n1 n2 = do
   bot_non_bot <- unify_struct env tag n1 n2
   virt_edges <- virtual_edges tag bot_non_bot
   rebind tag virt_edges n1
-  return ()
+  old_binder <- build_old_binder n1 n2
+  test_merges tag old_binder n1
+
 
 -- | Perform structural unification of two nodes.  Keep the information of
 -- the first node (if there is a choice).
@@ -102,8 +108,11 @@ unify env n1 n2 = do
 unify_struct :: (Applicative m, MonadIO m, MonadError String m) => 
                 Env -> Unique -> Node -> Node -> m [Node]
 unify_struct _env tag node1 node2 = do
+    traceU "unify_struct"
     (grafts, bots) <- go ([], []) node1 node2
+    traceU "checking for cycle"
     whenM (hasCycle node1) $ throwError "Cyclic"
+    traceU "done.  checking grafts"
     forM_ grafts $ \(_n, tr) ->
       forM_HistTree tr $ \nid bound -> do
         case bound of
@@ -111,6 +120,7 @@ unify_struct _env tag node1 node2 = do
           Bound b | FlexPerm <- bindPermissions b -> return ()
           Bound _ -> throwError $ "forbidden graft: " ++ show nid
         return ()
+    traceU "unify_struct done"
     return bots
   where
     -- The main worker.  Collects information on bottom nodes that were
@@ -127,23 +137,31 @@ unify_struct _env tag node1 node2 = do
     -- The rest is the usual unification stuff.
     -- 
     go (grafts,bots) n1 n2 = do
+      n1id <- nodeId n1; n2id <- nodeId n2
+      traceU $ "go " ++ show n1id ++ " " ++ show n2id
       equiv <- liftIO (UF.equivalent (node_info n1) (node_info n2))
       if equiv then return (grafts,bots) else do
+        traceU "go non-equiv"
         i1 <- liftIO $ UF.descriptor (node_info n1)
         i2 <- liftIO $ UF.descriptor (node_info n2)
         reset_unify_info tag i1
         reset_unify_info tag i2
         case (node_sort i1, node_sort i2) of
-          (Bot, Bot) -> 
+          (Bot, Bot) -> do
+            traceU "bot|bot"
             (grafts, bots) <$ fuse_ n1 n2
 
           (_, Bot) -> do
+            traceU "*|bot"
             u2nodes <- unifiedNodes <$> readRef (nodeUnifyInfo i2)
             let grafts' = (n1, u2nodes) : grafts
+            traceU "updating partial grafts"
             bots' <- add_bot n1 (nodeUnifyInfo i1) bots
-            (grafts', bots') <$ fuse_ n1 n2
+            traceU "fusing"
+            (grafts', bots') <$ fuse_ n1 n2 <* traceU "ok"
             
           (Bot, _) -> do
+            traceU "bot|*"
             u1nodes <- unifiedNodes <$> readRef (nodeUnifyInfo i1)
             let grafts' = (n1, u1nodes) : grafts
             bots' <- add_bot n2 (nodeUnifyInfo i2) bots
@@ -152,17 +170,9 @@ unify_struct _env tag node1 node2 = do
           (TyConNode c1, TyConNode c2)
             | c1 /= c2 -> throwError "cannot unify incompatible constructors"
             | otherwise -> do
+                traceU "TC|TC"
                 fuse_ n1 n2
                 foldM2 go (grafts, bots) (node_children i1) (node_children i2)
-
-    -- Monadic fold over two lists at once.  Input lists must be of same
-    -- length.
-    foldM2 :: Monad m => (a -> b -> c -> m a) -> a -> [b] -> [c] -> m a
-    foldM2 f a0 bs0 cs0 = worker a0 bs0 cs0
-      where worker a [] [] = return a
-            worker a (b:bs) (c:cs) = do a' <- f a b c
-                                        worker a' bs cs
-            worker _ _ _ = error "foldM2: arguments are not of same length"
 
     -- Fuse two nodes.  Keep information of first argument but record which
     -- nodes it came from in the unifyInfo
@@ -218,7 +228,7 @@ hasCycle n0 = runContT (callCC go) return
                     case IM.lookup n'id h' of
                       Just True -> abort True
                       Just False -> return h'
-                      Nothing -> visit (n:preds) h n')
+                      Nothing -> visit (n:preds) h' n')
                  (IM.insert nid True h) =<< nodeChildren n
          return (IM.insert nid False h')
 
@@ -259,8 +269,10 @@ virtual_edges :: (Applicative m, MonadIO m) =>
               -> m (IM.IntMap [Node])
                  -- ^ Map from node id to their virtual binders (all
                  -- with implicit binding flag 'Flex').
-virtual_edges tag bot_non_bots = foldM (update Nothing) IM.empty bot_non_bots
-  where
+virtual_edges tag bot_non_bots = do
+  traceU "virtual_edges"
+  foldM (update Nothing) IM.empty bot_non_bots
+ where
     update bound virt_edges n = do
       n_id <- nodeId n
       -- TODO: Why is this needed?
@@ -287,6 +299,7 @@ unifyInfo node = do
 rebind :: (Applicative m, MonadIO m, MonadError String m) => 
           Unique -> IM.IntMap [Node] -> Node -> m ()
 rebind tag virt_edges node = do
+  traceU "rebind"
   nodes <- topSort node
   mapM_ (\n -> do n_tag <- unifyTag <$> unifyInfo n
                   when (n_tag == tag) $ update_node n)
@@ -349,14 +362,110 @@ rebind tag virt_edges node = do
          , bindHeight = binder_height + 1
          }
 
-   foldr_HistTree _ c Empty = c
-   foldr_HistTree f c (Leaf nid b) = f nid b c
-   foldr_HistTree f c (Branch l r) =
-       foldr_HistTree f (foldr_HistTree f c r) l
-
    best_flag [] = Flex
    best_flag ((_, BoundInfo{ bindLabel = Rigid }):_) = Rigid
    best_flag ((_, BoundInfo{ bindLabel = Flex }):r) = best_flag r
+
+foldr_HistTree :: (NodeId -> Bound Node -> a -> a) -> a -> HistTree -> a
+foldr_HistTree _ c Empty = c
+foldr_HistTree f c (Leaf nid b) = f nid b c
+foldr_HistTree f c (Branch l r) =
+    foldr_HistTree f (foldr_HistTree f c r) l
+
+-- TODO: Try to find a way to get rid of this.
+build_old_binder :: (Applicative m, MonadIO m) =>
+                    Node -> Node -> m (IM.IntMap Int)
+build_old_binder n1 n2 = do
+  traceU "build_old_binder"
+  (update, _, old_binder, _) 
+      <- flip walk n2 =<< walk ([], IM.empty, IM.empty, IS.empty) n1
+  traceU $ "update: " ++ show (length update)
+  forM_ update $ \n -> do
+    n_id <- nodeId n
+    n' <- nodeCanon <$> nodeInfo n
+    n'id <- nodeId n'
+    traceU $ "canonical node: " ++ show n'id ++ "(of " ++ show n_id ++ ")"
+    liftIO (UF.union (old_struct n) (old_struct n'))
+    traceU $ "Ok"  
+  return old_binder
+ where
+   get_old_info n = liftIO $ UF.descriptor (old_struct n)
+
+   walk (update, new_to_old_node, old_binder, visited) n = do
+     n_old_id <- unNodeId . old_id <$> get_old_info n
+     merge_took_place <- unifyMergeHappened <$> unifyInfo n
+     if merge_took_place && not (IS.member n_old_id visited) then do
+       let visited' = IS.insert n_old_id visited
+       let update' = n : update
+       n_id <- nodeId n
+       let new_to_old_node' = IM.insert n_id n_old_id new_to_old_node
+       bnd <- getBinder n
+       old_binder' 
+           <- case bnd of
+                Root -> return old_binder
+                Bound BoundInfo{ bindBinder = b } -> do
+                  b_id <- nodeId b
+                  b_old_id
+                      <- case IM.lookup b_id new_to_old_node' of
+                           Just b_old_id_ -> return b_old_id_
+                           Nothing -> do
+                             -- This can happen if the node is bound above the root
+                             -- of the unification.
+                             b_old_id <- unNodeId . old_id <$> get_old_info b
+                             assert (b_old_id == b_id) $ return b_old_id
+                  return (IM.insert n_old_id b_old_id old_binder)
+       cs <- old_children <$> get_old_info n
+       r <- foldM walk (update', new_to_old_node', old_binder', visited') cs
+       return $ at2of4 (IM.delete n_id) r
+      else
+        return (update, new_to_old_node, old_binder, visited)
+ 
+   at2of4 f (a,b,c,d) = (a, f b, c, d)
+
+test_merges :: (Applicative m, MonadIO m, MonadError String m) =>
+               Unique -> IM.IntMap Int -> Node -> m ()
+test_merges tag old_binder node = do
+  traceU "test_merges"
+  walk IS.empty node
+  return ()
+ where
+   walk visited n = do
+     nid <- nodeId n
+     ui <- unifyInfo n
+     if not (IS.member nid visited) &&
+        tag == unifyTag ui && unifyMergeHappened ui
+      then do
+        let visited' = IS.insert nid visited
+        test_merges_node n
+        foldM walk visited' =<< nodeChildren n
+      else
+        return visited
+
+   test_merges_node n = do
+     ns <- unifiedNodes <$> unifyInfo n
+     n_id <- nodeId n
+     let h = foldr_HistTree go IM.empty ns
+         go nid b h_ =
+             case b of
+               Root -> error "test_merges"
+               Bound binfo ->
+                  let n' = fromMaybe (error "test_merges2") $
+                                     IM.lookup (unNodeId nid) old_binder
+                      hs = fromMaybe [] (IM.lookup n' h_)
+                  in IM.insert n' ((nid, bindPermissions binfo):hs) h_
+     let len2 (_:_:_) = True
+         len2 _ = False
+     let test_merge l | len2 l = do
+           forM_ l $ \(n'id, p) ->
+             when (p == LockedPerm) $
+               throwError $ "forbidden merge " ++ show n'id ++ " " ++ show n_id
+         test_merge _ = return ()
+     forM_ (IM.elems h) test_merge
+
+------------------------------------------------------------------------
+-- * Utils
+
+-- ** Topological Sort
 
 -- | Return node and its children in a topologically sorted order.
 topSort :: (Applicative m, MonadIO m) => Node -> m [Node]
@@ -371,7 +480,7 @@ topSort n0 = snd <$> go (IS.empty, []) n0
     onSnd = fmap
 
 ------------------------------------------------------------------------
--- * Lowest Common Ancestor
+-- ** Lowest Common Ancestor
 
 -- | An LCA set is a set where nodes are ordered according to their binding
 -- height (and their node id as a tie-breaker).  Used by 'lcaBinder'.

@@ -28,7 +28,10 @@ Library
                               value-supply    == 0.5.*,
                               transformers    == 0.1.*,
                               monads-fd       == 0.0.*,
-                              haxr            == 3000.2.*
+                              haxr            == 3000.2.*,
+                              directory       == 1.0.*,
+                              filepath        == 1.1.*,
+                              process         == 1.0.*
   GHC-Options:                -Wall
   Exposed-Modules:            
                               RPL.Names
@@ -53,6 +56,7 @@ Library
                               RPL.Typecheck.GrTy.Constraint
                               RPL.Typecheck.GrTy.Translate
                               RPL.Typecheck.GrTy.Unify
+                              RPL.Typecheck.GrTy.TestUtils
                               RPL.Utils.Misc
                               RPL.Utils.Monads
                               RPL.Utils.Panic

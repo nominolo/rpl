@@ -48,7 +48,7 @@ data ConstraintStore = ConstraintStore
 data ConstrType = MLF | ML
 
 
-dfs_interior :: (Applicative m, MonadIO m, MonadError String m) =>
+dfs_interior :: (Applicative m, MonadIO m {-, MonadError String m-} ) =>
                 (Node -> m [Node])
              -> (Node -> m ())
              -> (Node -> m ())

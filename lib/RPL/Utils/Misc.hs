@@ -13,3 +13,13 @@ unlessM c act = ifM c (return ()) act
 -- side effects.
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM c act = ifM c act (return ())
+
+-- Monadic fold over two lists at once.  Input lists must be of same
+-- length.
+foldM2 :: Monad m => (a -> b -> c -> m a) -> a -> [b] -> [c] -> m a
+foldM2 f a0 bs0 cs0 = worker a0 bs0 cs0
+  where worker a [] [] = return a
+        worker a (b:bs) (c:cs) = do a' <- f a b c
+                                    worker a' bs cs
+        worker _ _ _ = error "foldM2: arguments are not of same length"
+

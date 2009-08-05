@@ -124,22 +124,22 @@ union' p1 p2 update = do
   point1@(Pt link_ref1) <- repr p1
   point2@(Pt link_ref2) <- repr p2
   -- The precondition ensures that we don't create cyclic structures.
-  assert (point1 /= point2) $ do
-  Info info_ref1 <- readIORef link_ref1
-  Info info_ref2 <- readIORef link_ref2
-  MkInfo w1 d1 <- readIORef info_ref1 -- d1 is discarded
-  MkInfo w2 d2 <- readIORef info_ref2
-  d2' <- update d1 d2
-  -- Make the smaller tree a a subtree of the bigger one.  The idea is this: We
-  -- increase the path length of one set by one.  Assuming all elements are
-  -- accessed equally often, this means the penalty is smaller if we do it
-  -- for the smaller set of the two.
-  if w1 >= w2 then do
-    writeIORef link_ref2 (Link point1)
-    writeIORef info_ref1 (MkInfo (w1 + w2) d2')
-   else do
-    writeIORef link_ref1 (Link point2)
-    writeIORef info_ref2 (MkInfo (w1 + w2) d2')
+  when (point1 /= point2) $ do
+    Info info_ref1 <- readIORef link_ref1
+    Info info_ref2 <- readIORef link_ref2
+    MkInfo w1 d1 <- readIORef info_ref1 -- d1 is discarded
+    MkInfo w2 d2 <- readIORef info_ref2
+    d2' <- update d1 d2
+    -- Make the smaller tree a a subtree of the bigger one.  The idea is this: We
+    -- increase the path length of one set by one.  Assuming all elements are
+    -- accessed equally often, this means the penalty is smaller if we do it
+    -- for the smaller set of the two.
+    if w1 >= w2 then do
+      writeIORef link_ref2 (Link point1)
+      writeIORef info_ref1 (MkInfo (w1 + w2) d2')
+     else do
+      writeIORef link_ref1 (Link point2)
+      writeIORef info_ref2 (MkInfo (w1 + w2) d2')
 
 -- | /O(1)/. Return @True@ if both points belong to the same equivalence class.
 equivalent :: Point a -> Point a -> IO Bool

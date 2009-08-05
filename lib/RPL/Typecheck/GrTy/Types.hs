@@ -2,12 +2,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 module RPL.Typecheck.GrTy.Types 
-  ( Node(node_info), NodeId, Permissions(..), BindingLabel(..), ForallUse, NodeSort(..),
-    Bound(..), BoundInfo(..), 
-    NodeInfo(node_id, node_sort, node_children, nodeUnifyInfo, nodeBound),
-    UnifyInfo(..), HistTree(..),
-    newNode, nodeId, nodeSort, nodeArity, nodeChildren,
-    isRoot, setBinder, getBinder, binderNode, 
+  ( Node(..), NodeId(unNodeId), Permissions(..), BindingLabel(..),
+    ForallUse, NodeSort(..), Bound(..), BoundInfo(..),  OldStruct(..),
+    NodeInfo(..), UnifyInfo(..), HistTree(..),
+    newNode, nodeId, nodeSort, nodeArity, nodeChildren, nodeInfo,
+    isRoot, setBinder, getBinder, binderNode,  nodePermissions,
     fuse, nodesEqual, 
     newForallNode, isForall, forallCount, incrForallCount, decrForallCount,
     bindingHeight,
@@ -17,6 +16,7 @@ module RPL.Typecheck.GrTy.Types
   )
 where
 
+import RPL.Names ( idString )
 import qualified RPL.Type as Typ
 import qualified RPL.Utils.UnionFind as UF
 import RPL.Utils.Monads
@@ -35,7 +35,7 @@ import System.IO.Unsafe ( unsafePerformIO )
 
 -- * References
 
-newtype GTRef a = GTRef { unGTRef :: IORef a } deriving (Eq)
+newtype GTRef a = GTRef (IORef a) deriving (Eq)
 instance Show a => Show (GTRef a) where
   show (GTRef _) = "<ref>" --show (unsafePerformIO $ readIORef r)
 
@@ -58,7 +58,11 @@ data Node = Node
   } deriving (Eq)
 
 instance Show Node where
-  show (Node i _) = unsafePerformIO (show <$> UF.descriptor i)
+  show n@(Node i _) = unsafePerformIO $ do
+    id <- nodeId n
+    c_ids <- mapM nodeId =<< nodeChildren n
+    s <- nodeSort n
+    return ("<" ++ show id ++ ":" ++ show s ++ ":" ++ show c_ids ++ ">")
 
 -- * Terms
 
@@ -82,7 +86,13 @@ data NodeSort
   | TypeNode Typ.Type
   | Bot
   | Forall ForallUse
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show NodeSort where
+  show Bot = "_|_"
+  show (Forall _) = "Forall"
+  show (TyConNode tc) = idString $ Typ.tyConName tc
+  show (TypeNode t) = show t
 
 data NodeInfo = NodeInfo
   { node_id       :: {-# UNPACK #-} !NodeId
@@ -118,7 +128,10 @@ data HistTree
 
 instance Show Unique where show u = "u<" ++ show (hashUnique u) ++ ">"
 
-data OldStruct = OldStruct deriving (Eq, Show)
+data OldStruct = OldStruct 
+  { old_id :: NodeId
+  , old_children :: [Node]
+  } deriving (Eq, Show)
 
 dummyTag :: Unique
 dummyTag = unsafePerformIO $ newUnique
@@ -144,7 +157,7 @@ newNode nsort0 children = do
                   , unifiedNodes = Empty
                   , unifyBotNonBot = False
                   , unifyMergeHappened = False }
-  let old_struct_ = OldStruct
+  let old_struct_ = OldStruct { old_id = nid, old_children = children }
   node
       <- liftIO $ mfix $ \ n -> do
            bound_ref <- newRef Root
@@ -286,6 +299,11 @@ nodePermissions node = do
 
 bindFlexiblyTo :: (Applicative m, MonadIO m) => Node -> Maybe Node -> m ()
 bindFlexiblyTo node mb_binder = do
+  bindTo node mb_binder Flex
+{-
+  -- This saves a few pointer dereferencings by assuming the parent's
+  -- permission is FlexPerm.  Not sure it's worth the potential for errors,
+  -- hence commented out.
   set_binder node =<<
     case mb_binder of
       Nothing -> return Root
@@ -296,6 +314,7 @@ bindFlexiblyTo node mb_binder = do
                                   , bindPermissions = FlexPerm
                                   , bindHeight = height' + 1
                                   })
+-}
 
 bindTo :: (Applicative m, MonadIO m) => 
           Node -> Maybe Node -> BindingLabel -> m ()

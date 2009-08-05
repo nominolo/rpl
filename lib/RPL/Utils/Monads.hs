@@ -4,15 +4,17 @@ module RPL.Utils.Monads
     MonadState(..), gets, modify,
     MonadError(..), MonadIO(..),
     StrictStateErrorT, runStrictStateErrorT,
-    MonadGen(..)
+    MonadGen(..), StateT(..)
   )
 where
 
-import Control.Monad.Trans
+--import Control.Monad.Trans
+import Control.Monad.State
 import Control.Applicative
 import Control.Monad.State.Class
 import Control.Monad.Error.Class
-
+import Control.Monad.Error.Class
+import Control.Monad.Trans.Cont
 import Data.Supply
 
 -- * 'StrictStateErrorM' Monad
@@ -101,4 +103,10 @@ class Monad m => MonadGen s m where
     let (s', s'') = split2 s
     setSupply s''
     return (supplyValue s')
-  
+
+instance MonadGen s m => MonadGen s (ContT r m) where
+  getSupply = lift (getSupply)
+  setSupply s = lift (setSupply s)
+instance MonadGen s m => MonadGen s (StateT st m) where
+  getSupply = lift (getSupply)
+  setSupply s = lift (setSupply s)

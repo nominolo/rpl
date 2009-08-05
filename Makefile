@@ -71,7 +71,7 @@ $(DIST)/testsuite/setup-config: $(SETUP) $(DIST)/lib-pkg-conf testsuite/rpl-test
 $(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite: $(DIST)/testsuite/setup-config testsuite/RPL/**/*.hs
 	@echo === Building testsuite ===================================
 	@cd testsuite && \
-	../$(SETUP) build --builddir=../$(DIST)/testsuite $(CABAL_FLAGS)
+	../$(SETUP) build --ghc-options=-threaded --builddir=../$(DIST)/testsuite $(CABAL_FLAGS)
 
 .PHONY: clean all lib comp suite test
 
@@ -80,7 +80,7 @@ lib: $(DIST)/lib/build/libHSrpl-0.1.a
 comp: $(DIST)/rplc/build/rplc/rplc
 suite: $(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite
 test: suite
-	@./$(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite
+	@./$(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite --maximum-generated-tests=5000 +RTS -N2
 
 clean:
 	@$(RM) -rf $(SETUP_DIST) $(DIST)
