@@ -54,6 +54,7 @@ Library
                               RPL.Typecheck.HMX.Solver
                               RPL.Typecheck.GrTy.Types
                               RPL.Typecheck.GrTy.Constraint
+                              RPL.Typecheck.GrTy.Solve
                               RPL.Typecheck.GrTy.Translate
                               RPL.Typecheck.GrTy.Unify
                               RPL.Typecheck.GrTy.TestUtils

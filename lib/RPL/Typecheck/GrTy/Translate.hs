@@ -22,6 +22,11 @@ import Data.Maybe ( isJust )
 import Data.List ( intercalate, find )
 import Graphics.Ubigraph
 
+import System.Cmd
+import System.FilePath ( (<.>) )
+import System.Directory ( getTemporaryDirectory )
+import System.IO
+
 data GTMState = GTMState 
   { nextId :: Supply NodeId
   , st_edges :: [ConstrEdge]
@@ -206,7 +211,7 @@ t1 = do
          cs <- translate MLF [] expr
          liftIO $ do 
            dumpConstraints cs
-           writeFile "gtdump.dot" =<< dottyConstraints cs
+           writeFile "gtdump.dot" =<< dottyConstraints cs ""
            ubigraphConstraints cs
 --          let cb msg n = do nid <- nodeId n; print (msg, nid)
 --          dfs_interior nodeChildren (cb "frontier") (cb "pre") (cb "post")
@@ -215,7 +220,7 @@ t1 = do
          (cs',n1') <- expandForall cs MLF inst_edge
          liftIO $ do 
            dumpConstraints cs'
-           writeFile "gtdump1.dot" =<< dottyConstraints cs'
+           writeFile "gtdump1.dot" =<< dottyConstraints cs' ""
          return ()
       
   case r of
@@ -279,15 +284,28 @@ ppSort Bot           = "v"
 ppSort (Forall _)    = "G"
 
 
-dottyConstraints :: ConstraintStore -> IO String
-dottyConstraints cs = do
+dottyConstraints :: ConstraintStore -> String -> IO String
+dottyConstraints cs title = do
     nodes <- trans_close (cstore_root cs : cstore_existentials cs) M.empty
     nlines <- mapM ppNode (M.elems nodes)
     elines <- mapM ppEdge (cstore_constraints cs)
-    return $ header ++ unlines (nlines ++ elines) ++ footer
+    let dotty_descr = header ++ unlines (nlines ++ elines) ++ footer
+  
+    let dotty_cmd = "dot"
+    let open_png = "open"
+    tmp_dir <- getTemporaryDirectory
+    (path, h) <- openTempFile tmp_dir "dotdump"
+    hPutStr h dotty_descr
+    hFlush h
+    hClose h
+    let out = path <.> "png"
+    rawSystem dotty_cmd ["-Tpng", "-o", out, path ]
+    rawSystem open_png [out] 
+    
+    return dotty_descr
   where
     header = unlines ["digraph tygraph {"
-                     ,"\tgraph[fontsize=14, fontcolor=black, color=black];"
+                     ,"\tgraph[fontsize=14, fontcolor=black, color=black, label="++show title++"];"
                      ,"\tnode [label=\"\\N\", width=\"0.35\", shape=circle];"
                      ,"\tedge [fontsize=10];"]
     footer = "}\n"
@@ -312,7 +330,10 @@ dottyConstraints cs = do
                            Rigid -> "dashed") ++ "];"])
       return $ unlines $
          [ "\t" ++ show i ++ " [label=" ++ show (show i ++ " " ++ ppSort s) ++ 
-           (if r then ",shape=doublecircle" else "") 
+           (if r then ",shape=doublecircle" else "") ++
+           (case s of
+              Forall _ -> ",color=gray"
+              _ -> "")
            ++ "];" ] ++ 
          [ "\t" ++ show i ++ " -> " ++ show c ++ " [label=" ++ show (show m) ++ "];" 
             | (c,m) <- zip ch [(1::Int)..] ]
