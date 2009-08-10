@@ -34,6 +34,7 @@ Library
                               process         == 1.0.*
   GHC-Options:                -Wall
   Exposed-Modules:            
+                              RPL.Compiler
                               RPL.Names
                               RPL.Error
                               RPL.Lexer
