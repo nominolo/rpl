@@ -15,21 +15,20 @@ import qualified RPL.Names as Syn
 
 import Control.Applicative
 
-fastSolveOne :: (Applicative m, MonadIO m, MonadGen NodeId m, MonadError String m) => 
-         Env -> ConstraintStore -> ConstrEdge -> m ConstraintStore
+fastSolveOne ::
+    (Applicative m, MonadIO m, MonadGen NodeId m, MonadError String m) => 
+    Env -> ConstraintStore -> ConstrEdge -> m ConstraintStore
 fastSolveOne env cs edge = do
   let n1 = cedge_from edge
       n2 = cedge_to edge
-  (cs', n1', n2')
-      <- case cedge_type edge of
-           Unify -> return (cs, n1, n2)
-           Inst -> do
-             decrForallCount n1
-             (cs', n') <- expandForall cs MLF edge
-             return (cs', n', n2)
-  unify env n1' n2'
   -- TODO: better error message
-  return cs'
+  case cedge_type edge of
+    Unify -> do unify env n1 n2
+                return cs
+    Inst -> do decrForallCount n1
+               (cs', n') <- expandForall cs MLF edge
+               unify env n' n2
+               return cs'
 
 solve :: (Applicative m, MonadIO m, MonadGen NodeId m, MonadError String m) =>
          Env -> ConstraintStore -> m ConstraintStore
@@ -48,7 +47,8 @@ sv1 = do
   let u = noSrcSpan
   let expr = Syn.ELam u (Syn.VarPat u x) $
               Syn.ELam u (Syn.VarPat u y) $ 
-                Syn.EApp u (Syn.EVar u y) (Syn.EVar u x)
+               Syn.EApp u (Syn.EVar u y) (Syn.EVar u x) 
+               -- \x y -> y x :: forall a. a -> (forall b. a -> b)
   r <- runGTM $ do 
          cs <- translate MLF [] expr
          liftIO $ do 
@@ -56,5 +56,6 @@ sv1 = do
          cs' <- solve [] cs
          liftIO $ do 
            dottyConstraints cs' "final"
+           return ()
   print r
   return ()
