@@ -30,7 +30,6 @@ where
 import Data.IORef
 import Control.Monad ( when )
 import Control.Applicative
-import Control.Exception ( assert )
 
 -- | The abstract type of an element of the sets we work on.  It is
 -- parameterised over the type of the descriptor.
