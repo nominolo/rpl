@@ -20,9 +20,19 @@ import Control.Applicative
 
 data CompState = CompState
 
+defaultCompState :: CompState
+defaultCompState = CompState
+
 newtype CompM a = CompM (StrictStateErrorT CompState SourceError IO a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadError SourceError,
             MonadState CompState)
+
+runCompM :: CompState -> CompM a -> IO (Either SourceError a)
+runCompM s0 (CompM act) = do
+  r <- runStrictStateErrorT act s0
+  case r of
+    Left err -> return (Left err)
+    Right (a, _) -> return (Right a)
 
 parseFile :: FilePath -> CompM Syn.Program
 parseFile fname = do
