@@ -1,19 +1,18 @@
 {-# LANGUAGE BangPatterns #-}
-module RPL.Typecheck.GrTy.Syntactic where
+module RPL.Typecheck.GrTy.Syntactic ( toType, fromType ) where
 
 import RPL.Typecheck.GrTy.Types
 import RPL.Typecheck.GrTy.Utils
 import RPL.Type
 import RPL.Names
-import RPL.Utils.Pretty
 import RPL.Utils.Unique ( uniqueFromInt )
-import qualified Data.Set as S
 import qualified Data.IntMap as IM
-import Data.List ( sortBy, find, all )
+import Data.List ( sortBy, find )
 import Data.Ord ( comparing )
 import Data.Maybe ( fromMaybe )
 import RPL.Utils.Monads
 import Control.Applicative
+import Control.Exception ( assert )
 
 
 fromType :: (MonadIO m) => Type -> m Node
@@ -26,7 +25,6 @@ toType node = do
   bound_at <- inverseChildrenBinders node
   let go n = do
         n_id <- nodeId n
-        --io $ print ("go",n_id)
 
         let bound_at_n = 
               -- in increasing reverse post-order (i.e. post-order)
@@ -36,16 +34,10 @@ toType node = do
                   , let po = rpo_map IM.! n'id
                 ]
         n_sort <- nodeSort n
-        --io $ print =<< mapM (nodeId . snd) bound_at_n
         case n_sort of
           Bot -> do
-            --io $ print "bot"
-            -- bound_at_n == []            
-            nodeIdToTyVar n_id
+            assert (bound_at_n == []) $ nodeIdToTyVar n_id
           TyConNode tc -> do
-            --io $ print "tc"
-            --cts <- mapM (\nd -> nodeId nd >>= nodeIdToTyVar) =<< nodeChildren n
-            --io $ pprint cts
             bdrs <- binders n bound_at_n id
             cts <- substructs n =<< nodeChildren n
             return $ bdrs (tyConApp tc cts)
@@ -63,7 +55,7 @@ toType node = do
                        _ -> MLFCtxt is_rigid t'
           binders n0 lns (TyAll tv ctxt . acc)
 
-      substructs n0 [] = return []
+      substructs _n0 [] = return []
       substructs n0 (n:ns) = do
         Bound b <- getBinder n
         inl <- can_inline bound_at n0 (bindLabel b) n
@@ -102,7 +94,8 @@ toType node = do
        Bot -> return False
        TyConNode _ -> do
          n_id <- nodeId n
-         let bound_here = [ n' | (_,_,_,n') <- fromMaybe [] (IM.lookup n_id bound_at) ]
+         let bound_here =
+               [ n' | (_,_,_,n') <- fromMaybe [] (IM.lookup n_id bound_at) ]
          and <$> mapM (monomorphic bound_at) bound_here
 
 data Variance = Covariant | Contravariant deriving (Eq, Show)
