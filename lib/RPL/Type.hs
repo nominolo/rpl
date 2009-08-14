@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module RPL.Type 
   ( -- * Types
-    Type(..), Term, (.->.), mkFun, ftv
+    Type(..), Term, (.->.), mkFun, ftv, Ctxt(..)
   , -- * Type Constructors
     isInfixTyCon, tyConApp, TyCon(..), (@@)
     -- * Type Variables
@@ -32,7 +32,11 @@ data Type
   = TyVar TyVar
   | TyCon TyCon
   | TyApp Type Type
-  | TyAll TyVar Type
+  | TyAll TyVar Ctxt Type
+  deriving (Eq, Ord, Show)
+
+
+data Ctxt = BotCtxt | MLFCtxt Bool Type
   deriving (Eq, Ord, Show)
 
 data TyCon = MkTyCon 
@@ -175,7 +179,7 @@ ppr_parens False d = d
 ppr_type' :: Int -> Type -> PDoc
 ppr_type' _ (TyVar v) = ppr v
 ppr_type' _ (TyCon c) = ppr c
-ppr_type' d (TyAll v t) = ppr_parens (d > 0) $ ppr_forall [v] t
+ppr_type' d (TyAll v c t) = ppr_parens (d > 0) $ ppr_forall [(v,c)] t
 ppr_type' d (TyApp (TyApp (TyCon c) t) t')
   | isInfixTyCon c =
       let prec = infixTyConPrecedence c
@@ -189,11 +193,16 @@ ppr_type' d (TyApp (TyApp (TyCon c) t) t')
 ppr_type' d (TyApp t t') =
     ppr_parens (d > 100) $ ppr_type' 100 t <+> ppr_type' 101 t'
 
-ppr_forall :: [TyVar] -> Type -> PDoc
-ppr_forall vs (TyAll v t) = ppr_forall (v:vs) t
+ppr_forall :: [(TyVar, Ctxt)] -> Type -> PDoc
+ppr_forall vs (TyAll v c t) = ppr_forall ((v,c):vs) t
 ppr_forall vs t =
-    text "forall" <+> sep (map ppr (reverse vs)) <> char '.' <+>
+    text "forall" <+> sep (map ppr_ctxt (reverse vs)) <> char '.' <+>
     nest 2 (ppr_type' 0 t)
+  where
+    ppr_ctxt (v, BotCtxt) = ppr v
+    ppr_ctxt (v, MLFCtxt rigid t') =
+        parens $ ppr v <+> (if rigid then char '=' else char '>')
+                       <+> ppr t'
 
 -- | `True <=>` type constructor should be written infix instead of prefix.
 isInfixTyCon :: TyCon -> Bool
@@ -203,7 +212,7 @@ isInfixTyCon c = c == funTyCon
 -- and 100).  Type application has highest precedence (100), function arrow
 -- has lowest precedence (0).
 infixTyConPrecedence :: TyCon -> Int
-infixTyConPrecedence _ = 0 -- function
+infixTyConPrecedence _ = 1 -- function
 
 infixTyConAssoc :: TyCon -> Associativity
 infixTyConAssoc c | c == funTyCon = AssocRight

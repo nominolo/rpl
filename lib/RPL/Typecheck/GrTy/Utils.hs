@@ -2,65 +2,65 @@
 module RPL.Typecheck.GrTy.Utils where
 
 import RPL.Typecheck.GrTy.Types
-import qualified RPL.Type as Typ
-import qualified RPL.BuiltIn as Typ
-import RPL.Typecheck.GrTy.TestUtils
 import RPL.Utils.Monads
 import Control.Applicative
 import Control.Monad ( foldM )
+import Data.Array
 
+import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
-infixr 6 -->
+-- | Return nodes in reverse post-order starting at the given root.
+--
+-- This is equivalent to a topological sorting of the nodes.  That is, if
+-- @n@ is a child of @m@ then @reverse_post_order(m) <
+-- reverse_post_order(n)@.
+reversePostOrder :: (Applicative m, MonadIO m) => Node -> m (Array Int Node)
+reversePostOrder n_ = do
+    (_, po, ctr1) <- visit (IS.empty, [], 0 :: Int) n_
+    let !ctr = ctr1 - 1
+    return $ array (0, ctr) [ (ctr-i, n) | (i,n) <- po ]
+  where
+    visit (visited_, po, ctr_) n = do
+      n_id <- nodeId n
+      let !visited = IS.insert n_id visited_
+      cs <- nodeChildren n
+      (visited', post_order, ctr) <- foldM visit_children (visited, po, ctr_) cs
+      let !post_order' = (ctr, n):post_order
+      let !ctr' = ctr + 1
+      return (visited', post_order', ctr')
+    visit_children st@(vis, _, _) n = do
+      n_id <- nodeId n
+      if IS.member n_id vis then return st else visit st n
 
-tu1 = do 
-  n <- runM $ (nInt --> nInt) --> nInt --> nInt
---        (forAll $ \a ->
---         (forAll $ \b -> a --> b) --> (forAll $ \b -> a --> b))
---        --> nInt
---        (forAll $ \a -> (forAll $ \b -> b --> b) --> a)
-  dottyNode n
+nodeToPostOrder :: (Applicative m, MonadIO m) => Array Int Node -> m (IM.IntMap Int)
+nodeToPostOrder ordered = do
+  po_nids <- mapM (\(po, n) -> do n_id <- nodeId n
+                                  return (po, n_id))
+                  (assocs ordered)
+  return $ IM.fromList [ (n_id, po) | (po, n_id) <- po_nids ]
 
--- tu2 = (forAll $ \a ->
---         --(letN (forAll $ \b -> a --> b) $ \n -> n --> n))
---       --> nInt
+-- | Map from binder node to `[(node_id, label, sort)]`.
+type InverseChildrenBinders = IM.IntMap [(Int, BindingLabel, NodeSort, Node)]
 
-
-forAll :: (MonadGen NodeId m, MonadIO m, Applicative m) => (m Node -> m Node) -> m Node
-forAll f = do v <- newNode Bot []
-              n <- f (pure v)
-              bindTo v (Just n) Flex
-              return n
-
-(-->) :: (MonadGen NodeId m, MonadIO m, Applicative m) =>
-         m Node -> m Node -> m Node
-x --> y = do n1 <- x
-             n2 <- y
-             arr <- newNode (TyConNode Typ.funTyCon) [n1,n2]
-             bindTo n1 (Just arr) Rigid
-             bindTo n2 (Just arr) Rigid
-             return arr
-
-nInt :: (MonadGen NodeId m, MonadIO m) => m Node             
-nInt = do newNode (TyConNode Typ.typeInt) []
-          
-tu2 = runM $ do
-  n1 <- newNode Bot []
-  n2 <- newNode Bot []
-  n3 <- newNode Bot []
-  n4 <- newNode Bot []
-  n5 <- newNode (TyConNode Typ.funTyCon) [n1,n2]
-  n6 <- newNode (TyConNode Typ.funTyCon) [n3,n4]
-  n7 <- newNode (TyConNode Typ.funTyCon) [n5,n6]
-  bindTo n6 (Just n7) Flex
-  bindTo n3 (Just n6) Flex
-  bindTo n4 (Just n6) Flex
-  bindTo n5 (Just n7) Flex
-  bindTo n1 (Just n5) Flex
-  bindTo n2 (Just n5) Flex
-  liftIO $ do
-    --dottyNode n7
-    print =<< locallyCongruent n1 n2
-    print =<< locallyCongruent n1 n3
-    print =<< locallyCongruent n3 n4
-    print =<< locallyCongruent n5 n6
+-- | A map from binder to bound nodes.
+inverseChildrenBinders :: (Applicative m, MonadIO m) =>
+                          Node -> m InverseChildrenBinders
+inverseChildrenBinders node =
+  snd <$> (foldM go (IS.empty, IM.empty) =<< nodeChildren node)
+ where
+   go (vis_,res_) n = do
+     n_id <- nodeId n
+     if IS.member n_id vis_ then return (vis_, res_)
+      else do
+        let vis = IS.insert n_id vis_
+        b <- getBinder n
+        case b of
+          Root -> return (vis, res_)
+          Bound bi -> do
+            n'id <- nodeId (bindBinder bi)
+            nsort <- nodeSort n
+            let res = IM.alter (add_it (n_id, bindLabel bi, nsort, n)) n'id res_
+            foldM go (vis, res) =<< nodeChildren n
+   add_it x Nothing = Just [x]
+   add_it x (Just xs) = Just (x : xs)

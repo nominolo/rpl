@@ -7,10 +7,13 @@
 module RPL.Typecheck.GrTy.TestUtils where
 
 import RPL.Typecheck.GrTy.Types
+import RPL.Typecheck.GrTy.Utils
+import RPL.Typecheck.GrTy.Syntactic
 import qualified RPL.Type as Typ
 import qualified RPL.Names as Syn
 import RPL.Utils.Monads
 import RPL.Utils.Misc (foldM2, ifM)
+import RPL.Utils.Pretty
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -21,14 +24,14 @@ import Control.Applicative
 import Data.Maybe ( fromMaybe, isJust )
 import Data.Supply
 import Data.List ( nub )
-import Data.Array.IArray
+--import Data.Array.IArray
 import Data.Array.ST
 import Data.Array.Unboxed
 import System.Cmd
 import System.FilePath ( (<.>) )
 import System.Directory ( getTemporaryDirectory )
 import System.IO
-import Debug.Trace
+--import Debug.Trace
 
 newtype M a = M (StrictStateErrorT (Supply NodeId) String IO a)
     deriving (Functor, Applicative, Monad,
@@ -295,35 +298,11 @@ isInert :: Int -> InverseChildrenBinders -> Bool
 isInert n0 bound_at_n =
   all rigid_or_monomorphic $ fromMaybe [] $ IM.lookup n0 bound_at_n
  where
-   rigid_or_monomorphic (_, Rigid, _) = True
-   rigid_or_monomorphic (_, Flex, Bot) = False
-   rigid_or_monomorphic (n, _, _) = 
+   rigid_or_monomorphic (_, Rigid, _, _) = True
+   rigid_or_monomorphic (_, Flex, Bot, _) = False
+   rigid_or_monomorphic (n, _, _, _) = 
      all rigid_or_monomorphic $ fromMaybe [] $ IM.lookup n bound_at_n
 
--- | Map from binder node to `[(node_id, label, sort)]`.
-type InverseChildrenBinders = IM.IntMap [(Int, BindingLabel, NodeSort)]
-
--- | A map from binder to bound nodes.
-inverseChildrenBinders :: (Applicative m, MonadIO m) =>
-                          Node -> m InverseChildrenBinders
-inverseChildrenBinders node =
-  snd <$> (foldM go (IS.empty, IM.empty) =<< nodeChildren node)
- where
-   go (vis_,res_) n = do
-     n_id <- nodeId n
-     if IS.member n_id vis_ then return (vis_, res_)
-      else do
-        let vis = IS.insert n_id vis_
-        b <- getBinder n
-        case b of
-          Root -> return (vis, res_)
-          Bound bi -> do
-            n'id <- nodeId (bindBinder bi)
-            nsort <- nodeSort n
-            let res = IM.alter (add_it (n_id, bindLabel bi, nsort)) n'id res
-            return (vis, res)
-   add_it x Nothing = Just [x]
-   add_it x (Just xs) = Just (x : xs)
 
 dotty_cmd = "dot"
 open_png = "open"
@@ -738,7 +717,7 @@ checkInstance nleft_ nright ops_ = do
 -- | Copy a node and its children.  Note that the original node may still be
 -- a child of some other node, while the copied node will not.
 copyNode :: (Applicative m, MonadIO m, MonadGen NodeId m) => Node -> m Node
-copyNode node = do 
+copyNode node = do
   rpo <- reversePostOrder node
   let (start_node, end_node) = bounds rpo
 
@@ -811,36 +790,6 @@ copyNode node = do
       bind_here <- gets (fromMaybe [] . IM.lookup n_id . snd)
       forM_ bind_here $ \(m, l) -> bindTo m (Just n') l
 -}
--- | Return nodes in reverse post-order starting at the given root.
---
--- This is equivalent to a topological sorting of the nodes.  That is, if
--- @n@ is a child of @m@ then @reverse_post_order(m) <
--- reverse_post_order(n)@.
-reversePostOrder :: (Applicative m, MonadIO m) => Node -> m (Array Int Node)
-reversePostOrder n_ = do
-    (_, po, ctr1) <- visit (IS.empty, [], 0 :: Int) n_
-    let !ctr = ctr1 - 1
-    return $ array (0, ctr) [ (ctr-i, n) | (i,n) <- po ]
-  where
-    visit (visited_, po, ctr_) n = do
-      n_id <- nodeId n
-      let !visited = IS.insert n_id visited_
-      cs <- nodeChildren n
-      (visited', post_order, ctr) <- foldM visit_children (visited, po, ctr_) cs
-      let !post_order' = (ctr, n):post_order
-      let !ctr' = ctr + 1
-      return (visited', post_order', ctr')
-    visit_children st@(vis, _, _) n = do
-      n_id <- nodeId n
-      if IS.member n_id vis then return st else visit st n
-
-nodeToPostOrder :: (Applicative m, MonadIO m) => Array Int Node -> m (IM.IntMap Int)
-nodeToPostOrder ordered = do
-  po_nids <- mapM (\(po, n) -> do n_id <- nodeId n
-                                  return (po, n_id))
-                  (assocs ordered)
-  return $ IM.fromList [ (n_id, po) | (po, n_id) <- po_nids ]
-
 -- | The first component is the IDom information in terms of the node's
 -- reverse post-order (RPO) number.  E.g., if node @n@ has RPO number @3@
 -- and node @m@ is the immediate dominator of @n@ and its RPO number is @1@
@@ -1053,7 +1002,7 @@ ex1 = runM $ do
 
   k1 <- new_bot
   k2 <- new_fun k1 k1
-  k3 <- new_fun k1 k2
+  k3 <- new_fun k2 k1
   bind_flex k1 k3
   bind_flex k2 k3
 
@@ -1083,9 +1032,13 @@ ex1 = runM $ do
 --   liftIO . print . IM.toList =<< mkIDomMap =<< idoms nn
 --   liftIO $ dottyNode na
 
-  let wf = h3
-  liftIO $ dottyNode wf
-  liftIO . print =<< wellformed wf
+--   let wf = h3
+--   liftIO $ dottyNode wf
+--   liftIO . print =<< wellformed wf
+
+  let pp = k3
+  io $ dottyNode pp
+  io $ pprint =<< toType pp
 --   ops <- (n1 <? na)
 --   case ops of
 --     Nothing -> liftIO $ print "no instance"

@@ -87,7 +87,7 @@ instance MonadTrans (StrictStateErrorT s e) where
   lift m = SSET $ \k _ s -> m >>= k s
 
 instance MonadIO m => MonadIO (StrictStateErrorT s e m) where
-  liftIO io = SSET $ \k _ s -> liftIO io >>= k s
+  liftIO act = SSET $ \k _ s -> liftIO act >>= k s
 
 instance Monad m => MonadState s (StrictStateErrorT s e m) where
   get = SSET $ \k _ s -> k s s
