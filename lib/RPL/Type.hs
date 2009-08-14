@@ -139,6 +139,11 @@ ftv :: Type -> Set TyVar
 ftv (TyVar v)     = S.singleton v
 ftv (TyCon _)     = S.empty
 ftv (TyApp t1 t2) = S.union (ftv t1) (ftv t2)
+ftv (TyAll tv ctxt t) = S.delete tv (ftv t `S.union` ctxtFTV ctxt)
+
+ctxtFTV :: Ctxt -> Set TyVar
+ctxtFTV BotCtxt = S.empty
+ctxtFTV (MLFCtxt _ t) = ftv t
 
 -- | Free Type Variables of a type scheme.
 tsFTV :: TypeScheme -> Set TyVar
