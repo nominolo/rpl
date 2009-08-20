@@ -335,8 +335,8 @@ rebind tag virt_edges node = do
              throwError $ "forbidden weaken: " ++ show n'id ++ " " ++ show n_id
 
        -- The new binder is the lowest common ancestor (according to the
-       -- binding relation) of all merged nodes' binding edges
-       -- *and the virtual edges*.
+       -- binding relation) of all merged nodes' binding edges *and the
+       -- virtual edges*.
        new_binder 
            <- do a1 <- foldM (\s (_,bi) -> addLCASet s (bindBinder bi))
                              emptyLCASet merged_with_n

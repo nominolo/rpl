@@ -2,7 +2,8 @@
 -- Tarjan. \"Efficiency of a Good But Not Linear Set Union Algorithm\", JACM
 -- 22(2), 1975)
 --
--- The algorithm implements three operations efficiently (all amortised @O(1)):
+-- The algorithm implements three operations efficiently (all amortised
+-- @O(1)@):
 --
 --  1. Check whether two elements are in the same equivalence class.
 --
@@ -38,8 +39,9 @@ newtype Point a = Pt (IORef (Link a)) deriving Eq
 data Link a 
     = Info (IORef (Info a))
       -- ^ This is the descriptive element of the equivalence class.
-    | Link (Point a) deriving Eq
+    | Link (Point a)
       -- ^ Pointer to some other element of the equivalence class.
+     deriving Eq
 
 data Info a = MkInfo
   { weight :: !Int -- == the size of the equivalence class, used in 'union'
