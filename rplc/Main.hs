@@ -17,5 +17,5 @@ main = print =<< (runCompM defaultCompState $ do
   s <- io $ BS.getContents
   e <- parse "<stdin>" s
   io $ pprint e
-  r <- typecheck AlgorithmW e
+  r <- typecheck GraphicTypes e
   io $ debugPrint r)

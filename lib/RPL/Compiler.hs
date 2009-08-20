@@ -11,6 +11,7 @@ import RPL.Utils.SrcLoc
 import RPL.Utils.Monads
 import RPL.Typecheck.AlgorithmW
 import RPL.Typecheck.Subst ( apply )
+import RPL.Typecheck.GrTy
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import System.FilePath
@@ -57,4 +58,7 @@ typecheck AlgorithmW expr = do
     Right (subst, t) ->
         return (apply subst t)
 typecheck GraphicTypes expr = do
-  return (error "unimplemented")
+  r <- liftIO $ tcExpr MLF expr
+  case r of
+    Right t -> return t
+    Left msg -> throwError (SourceError noSrcSpan (OtherError msg))

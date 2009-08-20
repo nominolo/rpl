@@ -21,6 +21,7 @@ data ErrorMessage
   | TypeMismatch String String
   | MultiplePatVars [Id]
   | WrongUserType PDoc
+  | OtherError String
   deriving (Eq, Show)
 
 ------------------------------------------------------------------------
