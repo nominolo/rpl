@@ -58,7 +58,7 @@ $(DIST)/rplc/setup-config: $(SETUP) $(DIST)/lib-pkg-conf rplc/rplc.cabal
 	@cd rplc && \
 	../$(SETUP) configure --with-compiler=$(HC) --with-hc-pkg=$(PKG) \
 		--user --builddir=../$(DIST)/rplc $(CABAL_FLAGS)
-$(DIST)/rplc/build/rplc/rplc: $(DIST)/rplc/setup-config
+$(DIST)/rplc/build/rplc/rplc: $(DIST)/rplc/setup-config $(wildcard rplc/*)
 	@echo === Building rplc ========================================
 	@cd rplc && \
 	../$(SETUP) build --builddir=../$(DIST)/rplc $(CABAL_FLAGS)
