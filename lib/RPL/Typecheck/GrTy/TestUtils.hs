@@ -377,7 +377,7 @@ ppSort :: NodeSort -> String
 ppSort (TyConNode tc) = Syn.idString (Typ.tyConName tc)
 ppSort (TypeNode _)  = "T"
 ppSort Bot           = "v"
-ppSort (Forall _)    = "G"
+ppSort (Forall loc _)    = "G" ++ pretty loc
 
 type Path = [Int]
 
@@ -714,82 +714,6 @@ checkInstance nleft_ nright ops_ = do
      n' <- (!! (i-1)) <$> nodeChildren n
      node_at_path n' is
 
--- | Copy a node and its children.  Note that the original node may still be
--- a child of some other node, while the copied node will not.
-copyNode :: (Applicative m, MonadIO m, MonadGen NodeId m) => Node -> m Node
-copyNode node = do
-  rpo <- reversePostOrder node
-  let (start_node, end_node) = bounds rpo
-
-  -- copy nodes bottom-up so we have already copied the children
-  let copy_children !i copied po | i < start_node = return (po, copied)
-                                 | otherwise = do
-        let n = rpo ! i
-        n_id <- nodeId n
-        nsort <- nodeSort n
-        cs <- nodeChildren n
-        cs' <- forM cs $ \c -> (copied IM.!) <$> nodeId c
-        n' <- newNode nsort cs'
-        copy_children (i - 1) (IM.insert n_id n' copied) (n':po)
-
-  ((node':po), copied) <- copy_children end_node IM.empty []
-
-  copy_root_binder node' -- treated specially (can be the root)
-
-  -- copy binders top-down, so the new permissions are correct
-  let copy_binders [] _ = return ()
-      copy_binders (n':n's) !i = do
-        let n = rpo ! i
-        Bound bi <- getBinder n -- only @node@ can be root
-        b_id <- nodeId (bindBinder bi)
-        case IM.lookup b_id copied of
-          Nothing -> bindTo n' (Just (bindBinder bi)) (bindLabel bi)
-          Just b' -> bindTo n' (Just b') (bindLabel bi)
-        copy_binders n's (i + 1)
-
-  copy_binders po (start_node + 1)
-
-  return node'
-
- where
-   copy_root_binder node' = do
-     bdr <- getBinder node
-     case bdr of
-       Root -> return ()
-       Bound bi -> bindTo node' (Just (bindBinder bi)) (bindLabel bi)
-
-{-
-    n <- fst <$> runStateT (go node) (IM.empty, IM.empty)
-    recomputePermissions n
-    return n
-  where
-    ifVisited n m m2 = do
-      n_id <- nodeId n
-      visited <- gets fst
-      case IM.lookup n_id visited of
-        Just n' -> m n'
-        Nothing -> do
-          n' <- m2
-          modify (\(_,bs) -> (IM.insert n_id n' visited, bs))
-          return n'
-    go n = 
-      ifVisited n return $ do
-        cs <- nodeChildren n
-        cs' <- mapM go cs
-        n_sort <- nodeSort n
-        n' <- newNode n_sort cs'
-        add_binder n' =<< getBinder n
-        do_binds n' n
-        return n'
-    add_binder _ Root = return ()
-    add_binder n (Bound bi) = do
-      b_id <- nodeId (bindBinder bi)
-      modify $ \(vis, bs) -> (vis, IM.insertWith (++) b_id [(n, bindLabel bi)] bs)
-    do_binds n' n = do
-      n_id <- nodeId n
-      bind_here <- gets (fromMaybe [] . IM.lookup n_id . snd)
-      forM_ bind_here $ \(m, l) -> bindTo m (Just n') l
--}
 -- | The first component is the IDom information in terms of the node's
 -- reverse post-order (RPO) number.  E.g., if node @n@ has RPO number @3@
 -- and node @m@ is the immediate dominator of @n@ and its RPO number is @1@

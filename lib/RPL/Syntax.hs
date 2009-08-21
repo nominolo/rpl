@@ -117,6 +117,13 @@ viewApp expr = panic $
      $+$
     text "Input was:" <+> text (show expr)
 
+viewTypeApp :: Type -> (Type, [Type])
+viewTypeApp (TApp _ t1_ t2_) = go t1_ [t2_]
+  where
+    go (TApp _ t1 t2) args = go t1 (t2 : args)
+    go tc             args = (tc, args)
+viewTypeApp t = (t, [])
+
 ------------------------------------------------------------------------
 -- * Pretty Instances
 

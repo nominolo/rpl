@@ -10,6 +10,7 @@ import RPL.Typecheck.GrTy.Unify
 import RPL.Typecheck.GrTy.Translate
 import RPL.Typecheck.GrTy.Constraint
 import RPL.Typecheck.GrTy.TestUtils
+import RPL.Typecheck.GrTy.Utils
 
 import qualified RPL.Type as Typ
 import qualified RPL.BuiltIn as Typ

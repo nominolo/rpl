@@ -1,12 +1,19 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE BangPatterns #-}
-module RPL.Typecheck.GrTy.Syntactic ( toType, fromType ) where
+module RPL.Typecheck.GrTy.Syntactic
+  ( toType, fromType, mkCoercion )
+where
 
 import RPL.Typecheck.GrTy.Types
 import RPL.Typecheck.GrTy.Utils
 import RPL.Type
+import RPL.BuiltIn
+import qualified RPL.Syntax as Syn
 import RPL.Names
 import RPL.Utils.Unique ( uniqueFromInt )
 import qualified Data.IntMap as IM
+import qualified Data.Map as M
 import Data.List ( sortBy, find )
 import Data.Ord ( comparing )
 import Data.Maybe ( fromMaybe )
@@ -14,9 +21,98 @@ import RPL.Utils.Monads
 import Control.Applicative
 import Control.Exception ( assert )
 
+-- | Translate a /syntactic/ type to a node.
+--
+-- The first result is the root of the type graph, the second is a list of
+-- all existentially qualified vars.
+-- 
+-- TODO: This implicitly forall-qualifies unqualified vars.  We eventually
+-- want to accept an TyVarEnv so we can refer to variables qualified above.
+-- 
+fromType :: (MonadGen NodeId m, Applicative m, MonadIO m) =>
+            Syn.Type -> m (Node, [Node])
+fromType user_type = do 
+    (node, unbound) <- translate M.empty user_type
+    mapM_ (\n -> bindTo n (Just node) Flex) unbound
+    return (node, [])
+  where
+    translate env (Syn.TVar _ tv)
+      | Just node <- M.lookup tv env = return (node, [])
+      | otherwise = do 
+          n <- newNode Bot []
+          return (n, [n])
+    translate env (Syn.TAll _ v ty) = do
+      n <- newNode Bot []
+      (n', free) <- translate (M.insert v n env) ty
+      bindTo n (Just n') Flex
+      return (n', free)
+    translate env (Syn.TFun _ t1 t2) = do
+      (n1, free1) <- translate env t1
+      (n2, free2) <- translate env t2
+      fn <- newNode (TyConNode funTyCon) [n1, n2]
+      mapM (\n -> bindTo n (Just fn) Flex) [n1, n2]
+      return (fn, free1 ++ free2)
+          
+    translate env ty
+      | (Syn.TCon _ tc_id, args) <- Syn.viewTypeApp ty = do
+          case lookupTyCon tc_id of
+            Just tycon 
+             | length args == tyConArity tycon -> do
+                 (ns, frees) <- translateList env args
+                 tcn <- newNode (TyConNode tycon) ns
+                 mapM_ (\n -> bindTo n (Just tcn) Flex) ns
+                 return (tcn, frees)
+             | otherwise -> error "Arity mismatch"  -- XXX: implement kind checker
+            _ -> error "Unknown type constructor"   -- TODO: error message
 
-fromType :: (MonadIO m) => Type -> m Node
-fromType = undefined
+    translateList _env [] = return ([], [])
+    translateList env (t:ts) = do
+      (n, free) <- translate env t
+      (ns, frees) <- translateList env ts
+      return (n:ns, free ++ frees)
+    
+    lookupTyCon n = M.lookup (idString n) initialTypeEnv
+    initialTypeEnv =
+      M.fromList [ (idString (tyConName tc), tc) 
+                  | tc <- [typeInt, typeChar, typeMaybe] ]
+
+-- | Computes the coercion function for the given user type.
+-- 
+-- Coercion functions are used to implement type annotations.  Instead of
+-- having a special rule for type annotations, we translate them to
+-- applications of coercion functions:
+-- 
+-- > e :: t   ==>   c_t e
+-- 
+-- > \(x :: t) -> e  ==> \x -> let x = (x :: t) in e
+-- 
+-- A coercion is built by translating the type into a graph and then
+-- creating a function type:
+-- 
+-- > c_t :: forall (a = t) (b > t). a -> b
+-- 
+-- Note the rigid binding of @a@.  This has the effect that if @t@ is
+-- polymorphic, we /require/ the polymorphism in the argument and /allow/
+-- polymorphism in the result.
+-- 
+-- Note that the two occurrences of @t@ are not shared.  We do, however, use
+-- sharing for existentially bound variables:
+-- 
+-- > t = exists b. forall a. b -> (a -> a)
+-- > c_t :: forall b 
+-- >               (x = forall c. b -> (c -> c))
+-- >               (y > forall e. b -> (e -> e)).
+-- >          x -> y
+-- 
+mkCoercion :: (MonadGen NodeId m, Applicative m, MonadIO m) =>
+              Syn.Type -> m Node
+mkCoercion user_type = do
+  (n, _existentials) <- fromType user_type
+  n' <- copyNode n
+  co <- newNode (TyConNode funTyCon) [n, n']
+  bindTo n (Just co) Rigid  -- This is the key part.
+  bindTo n' (Just co) Flex
+  return co
 
 toType :: (Applicative m, MonadIO m) => Node -> m Type
 toType node = do

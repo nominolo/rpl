@@ -22,6 +22,7 @@ import qualified RPL.Utils.UnionFind as UF
 import RPL.Utils.Monads
 import RPL.Utils.Panic
 import RPL.Utils.Pretty
+import RPL.Utils.SrcLoc
 
 import Control.Applicative
 import Data.IORef
@@ -85,12 +86,12 @@ data NodeSort
   = TyConNode Typ.TyCon
   | TypeNode Typ.Type
   | Bot
-  | Forall ForallUse
+  | Forall SrcSpan ForallUse
   deriving (Eq)
 
 instance Show NodeSort where
   show Bot = "_|_"
-  show (Forall _) = "Forall"
+  show (Forall _ _) = "Forall"
   show (TyConNode tc) = idString $ Typ.tyConName tc
   show (TypeNode t) = show t
 
@@ -144,11 +145,11 @@ newNode :: (MonadIO m, MonadGen NodeId m) =>
            NodeSort -> [Node] -> m Node
 newNode nsort0 children = do
   nsort <- case nsort0 of
-             Forall (ForallUse r) -> do
+             Forall sp (ForallUse r) -> do
                -- Don't share the reference from the argument.
                count <- readRef r
                r' <- newRef count
-               return $ Forall (ForallUse r')
+               return $ Forall sp (ForallUse r')
              _ -> return nsort0
 
   nid <- newNodeId
@@ -194,7 +195,7 @@ nodeArity node = do
   nsort <- nodeSort node
   return $ case nsort of
              Bot -> 0
-             Forall _ -> 1
+             Forall _ _ -> 1
              TypeNode _ -> 0
              TyConNode tc -> Typ.tyConArity tc
 
@@ -246,20 +247,20 @@ fuse keep@(Node ni1 os1) (Node ni2 os2) mb_bound = do
   liftIO $ UF.union os2 os1
 
 -- | Create a new forall node sort.
-newForallSort :: (Applicative m, MonadIO m) => m NodeSort
-newForallSort = Forall . ForallUse <$> liftIO (newRef 0)
+newForallSort :: (Applicative m, MonadIO m) => SrcSpan -> m NodeSort
+newForallSort loc = Forall loc . ForallUse <$> liftIO (newRef 0)
 
 newForallNode :: (Applicative m, MonadIO m, MonadGen NodeId m) => 
-                 [Node] -> m Node
-newForallNode children = do
-  fa <- newForallSort
+                 SrcSpan -> [Node] -> m Node
+newForallNode loc children = do
+  fa <- newForallSort loc
   newNode fa children
 
 isForall :: (Applicative m, MonadIO m) => Node -> m Bool
 isForall node = do
   nsort <- nodeSort node
   case nsort of
-    Forall _ -> return True
+    Forall _ _ -> return True
     _ -> return False
 
 -- | Return number of references to this forall, i.e., the number of
@@ -272,7 +273,7 @@ forall_count_ref :: (Applicative m, MonadIO m) => Node -> m (GTRef Int)
 forall_count_ref node = do
   nsort <- nodeSort node
   case nsort of
-    Forall (ForallUse r) -> return r
+    Forall _ (ForallUse r) -> return r
     _ -> panic (text "forall_count_ref: Node not a forall")
 
 -- | Increase the forall use counter by 1.

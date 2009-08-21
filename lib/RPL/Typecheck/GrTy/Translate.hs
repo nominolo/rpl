@@ -4,6 +4,7 @@ module RPL.Typecheck.GrTy.Translate where
 
 import RPL.Typecheck.GrTy.Types
 import RPL.Typecheck.GrTy.Constraint
+import RPL.Typecheck.GrTy.Syntactic
 import qualified RPL.Type as Typ
 import qualified RPL.BuiltIn as Typ
 import qualified RPL.Syntax as Syn
@@ -121,7 +122,7 @@ translate ct _env exp0 = do
     --  n =<= b
     create_real_forall vars mb_f e = do
       b <- newNode Bot []
-      f' <- newForallNode [b]
+      f' <- newForallNode (Syn.exprSpan e) [b]
       f' `bindFlexiblyTo` mb_f
       when (isJust mb_f) $
         exists_ f'
@@ -132,7 +133,7 @@ translate ct _env exp0 = do
     create_forall vars fbind f e = do
       -- TODO: optimise degenerate cases
       b <- newNode Bot []
-      f' <- newForallNode [b]
+      f' <- newForallNode (Syn.exprSpan e) [b]
       exists_ f'
       f' `bindFlexiblyTo` (Just f)
       let bndr = case ct of
@@ -197,6 +198,24 @@ translate ct _env exp0 = do
           f2 <- translate_ vars' fbind f e2
           -- add l_expr_roots f1 (loc v)
           return f2
+
+        Syn.EAnn _ e2 ty -> do
+          co <- mkCoercion ty
+          f' <- newForallNode (Syn.typeSpan ty) [co]
+          f' `bindFlexiblyTo` (Just f)
+          co `bindFlexiblyTo` (Just f')
+
+          arg <- new_bound_node Bot []
+          res <- new_bound_node Bot []
+          arr <- new_bound_node (TyConNode Typ.funTyCon) [arg, res]
+          exists_ arr
+          
+          farg <- create_forall vars fbind f e2
+
+          constrain farg arg ()
+          constrain f' arr ()
+
+          return res
 
 t1 :: IO ()
 t1 = do 
@@ -281,7 +300,7 @@ ppSort :: NodeSort -> String
 ppSort (TyConNode tc) = Syn.idString (Typ.tyConName tc)
 ppSort (TypeNode _)  = "T"
 ppSort Bot           = "v"
-ppSort (Forall _)    = "G"
+ppSort (Forall loc _)    = "G" ++ pretty loc
 
 
 dottyConstraints :: ConstraintStore -> String -> IO String
@@ -323,7 +342,7 @@ dottyConstraints cs title = do
                 f <- isForall (bindBinder b)
                 return $ 
                   ["\t" ++ show b_id ++ " -> " ++ show i
-                        ++ " [dir=back, constraint=" ++ (if f then "true" else "false") 
+                        ++ " [dir=back" -- , constraint=" ++ (if f then "true" else "false") 
                         ++ ", style=" ++ 
                         (case bindLabel b of
                            Flex -> "dotted"
@@ -332,7 +351,7 @@ dottyConstraints cs title = do
          [ "\t" ++ show i ++ " [label=" ++ show (show i ++ " " ++ ppSort s) ++ 
            (if r then ",shape=doublecircle" else "") ++
            (case s of
-              Forall _ -> ",color=gray"
+              Forall _ _ -> ",color=gray"
               _ -> "")
            ++ "];" ] ++ 
          [ "\t" ++ show i ++ " -> " ++ show c ++ " [label=" ++ show (show m) ++ "];" 
@@ -370,7 +389,7 @@ ubigraphConstraints cstore = do
         Bot -> do
           setVertexAttribute defaultServer nid "color" "#ff0000"
           setVertexAttribute defaultServer nid "shape" "sphere"
-        Forall _ -> do
+        Forall _ _ -> do
           setVertexAttribute defaultServer nid "color" "#008800"
           setVertexAttribute defaultServer nid "shape" "cube"
           r <- isRoot node

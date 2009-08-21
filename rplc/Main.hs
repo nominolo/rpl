@@ -15,7 +15,7 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 
 main = print =<< (runCompM defaultCompState $ do
   s <- io $ BS.getContents
-  e <- parse "<stdin>" s
+  e <- parse "" s
   io $ pprint e
   r <- typecheck GraphicTypes e
   io $ debugPrint r)

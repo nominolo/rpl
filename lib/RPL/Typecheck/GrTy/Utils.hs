@@ -1,10 +1,11 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 module RPL.Typecheck.GrTy.Utils where
 
 import RPL.Typecheck.GrTy.Types
 import RPL.Utils.Monads
 import Control.Applicative
-import Control.Monad ( foldM )
+import Control.Monad ( foldM, forM )
 import Data.Array
 
 import qualified Data.IntMap as IM
@@ -64,3 +65,47 @@ inverseChildrenBinders node =
             foldM go (vis, res) =<< nodeChildren n
    add_it x Nothing = Just [x]
    add_it x (Just xs) = Just (x : xs)
+
+-- | Copy a node and its children.  Note that the original node may still be
+-- a child of some other node, while the copied node will not.
+copyNode :: (Applicative m, MonadIO m, MonadGen NodeId m) => Node -> m Node
+copyNode node = do
+  rpo <- reversePostOrder node
+  let (start_node, end_node) = bounds rpo
+
+  -- copy nodes bottom-up so we have already copied the children
+  let copy_children !i copied po | i < start_node = return (po, copied)
+                                 | otherwise = do
+        let n = rpo ! i
+        n_id <- nodeId n
+        nsort <- nodeSort n
+        cs <- nodeChildren n
+        cs' <- forM cs $ \c -> (copied IM.!) <$> nodeId c
+        n' <- newNode nsort cs'
+        copy_children (i - 1) (IM.insert n_id n' copied) (n':po)
+
+  ((node':po), copied) <- copy_children end_node IM.empty []
+
+  copy_root_binder node' -- treated specially (can be the root)
+
+  -- copy binders top-down, so the new permissions are correct
+  let copy_binders [] _ = return ()
+      copy_binders (n':n's) !i = do
+        let n = rpo ! i
+        Bound bi <- getBinder n -- only @node@ can be root
+        b_id <- nodeId (bindBinder bi)
+        case IM.lookup b_id copied of
+          Nothing -> bindTo n' (Just (bindBinder bi)) (bindLabel bi)
+          Just b' -> bindTo n' (Just b') (bindLabel bi)
+        copy_binders n's (i + 1)
+
+  copy_binders po (start_node + 1)
+
+  return node'
+
+ where
+   copy_root_binder node' = do
+     bdr <- getBinder node
+     case bdr of
+       Root -> return ()
+       Bound bi -> bindTo node' (Just (bindBinder bi)) (bindLabel bi)

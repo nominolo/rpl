@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE FlexibleContexts #-}
 module RPL.Typecheck.GrTy.Solve ( fastSolveOne, solve ) where
@@ -34,11 +35,13 @@ solve :: (Applicative m, MonadIO m, MonadGen NodeId m, MonadError String m) =>
          Env -> ConstraintStore -> m ConstraintStore
 solve env cs_ = do
   let go _ cs | [] <- cstore_constraints cs = return cs
-      go n cs | (e:es) <- cstore_constraints cs = do
+      go !n cs | (e:es) <- cstore_constraints cs = do
         cs' <- fastSolveOne env (cs { cstore_constraints = es }) e
         --liftIO $ dottyConstraints cs' ("step " ++ show (n :: Int))
         go (n + 1) cs'
-  go (0::Int) cs_
+  cs <- go (0::Int) cs_
+  liftIO $ dottyConstraints cs "final"
+  return cs
 
 sv1 :: IO ()
 sv1 = do
