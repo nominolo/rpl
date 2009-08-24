@@ -5,7 +5,8 @@ module RPL.Utils.Monads
     MonadError(..), MonadIO(..),
     StrictStateErrorT, runStrictStateErrorT,
     MonadGen(..), StateT(..),
-    io
+    io,
+    module Control.Applicative, when
   )
 where
 
@@ -17,6 +18,7 @@ import Control.Monad.Error.Class
 import Control.Monad.Error.Class
 import Control.Monad.Trans.Cont
 import Data.Supply
+import Control.Monad
 
 io :: MonadIO m => IO a -> m a
 io = liftIO
