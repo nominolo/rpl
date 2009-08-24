@@ -1,5 +1,5 @@
 module RPL.Typecheck.GrTy 
-  ( tcExpr, ConstrType(..) )
+  ( tcExpr, ConstrType(..), SolveOpts(..), defaultSolveOpts )
 where
 
 import RPL.Typecheck.GrTy.Types
@@ -11,11 +11,11 @@ import RPL.Typecheck.GrTy.Solve
 import qualified RPL.Syntax as Syn
 import RPL.Type
 
-tcExpr :: ConstrType -> Syn.Expr -> IO (Either String Type)
-tcExpr ctype expr =
+tcExpr :: SolveOpts -> ConstrType -> Syn.Expr -> IO (Either String Type)
+tcExpr opts ctype expr =
   runGTM $ do
     cstore <- translate ctype [] expr
-    cstore' <- solve [] cstore
+    cstore' <- solve opts [] cstore
     let root_gen_node = cstore_root cstore'
     [root_type] <- nodeChildren root_gen_node
     expr_typ <- toType root_type

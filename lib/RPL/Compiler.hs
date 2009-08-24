@@ -58,7 +58,7 @@ typecheck AlgorithmW expr = do
     Right (subst, t) ->
         return (apply subst t)
 typecheck GraphicTypes expr = do
-  r <- liftIO $ tcExpr MLF expr
+  r <- liftIO $ tcExpr defaultSolveOpts MLF expr
   case r of
     Right t -> return t
     Left msg -> throwError (SourceError noSrcSpan (OtherError msg))

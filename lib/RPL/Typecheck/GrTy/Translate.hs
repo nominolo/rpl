@@ -158,7 +158,7 @@ translate ct _env exp0 = do
               constrain node' var_occ ()
               return var_occ
             Nothing ->
-              throwError $ "unbound variable:" ++ pretty name
+              throwError $ "unbound variable: " ++ pretty name
 
         Syn.ELam _ (Syn.VarPat _ var) body -> do
           -- arg <- newVar
@@ -230,7 +230,7 @@ t1 = do
          cs <- translate MLF [] expr
          liftIO $ do 
            dumpConstraints cs
-           writeFile "gtdump.dot" =<< dottyConstraints cs ""
+           dottyConstraints cs ""
            ubigraphConstraints cs
 --          let cb msg n = do nid <- nodeId n; print (msg, nid)
 --          dfs_interior nodeChildren (cb "frontier") (cb "pre") (cb "post")
@@ -239,7 +239,7 @@ t1 = do
          (cs',n1') <- expandForall cs MLF inst_edge
          liftIO $ do 
            dumpConstraints cs'
-           writeFile "gtdump1.dot" =<< dottyConstraints cs' ""
+           dottyConstraints cs' ""
          return ()
       
   case r of
@@ -303,7 +303,7 @@ ppSort Bot           = "v"
 ppSort (Forall loc _)    = "G" ++ pretty loc
 
 
-dottyConstraints :: ConstraintStore -> String -> IO String
+dottyConstraints :: ConstraintStore -> String -> IO ()
 dottyConstraints cs title = do
     nodes <- trans_close (cstore_root cs : cstore_existentials cs) M.empty
     nlines <- mapM ppNode (M.elems nodes)
@@ -321,7 +321,7 @@ dottyConstraints cs title = do
     rawSystem dotty_cmd ["-Tpng", "-o", out, path ]
     rawSystem open_png [out] 
     
-    return dotty_descr
+    return () --dotty_descr
   where
     header = unlines ["digraph tygraph {"
                      ,"\tgraph[fontsize=14, fontcolor=black, color=black, label="++show title++"];"

@@ -1,21 +1,33 @@
 module Main where
 
--- import RPL.Syntax
--- import qualified RPL.Lexer as L
--- import RPL.Parser
--- import RPL.Utils.SrcLoc
-import RPL.Utils.Pretty
---import RPL.Typecheck.InferHMX
---import RPL.Typecheck.AlgorithmW
-
 import RPL.Compiler
+import RPL.Utils.Pretty
 import RPL.Utils.Monads
 
+import Data.List ( partition )
+import System.Environment
 import qualified Data.ByteString.Lazy.Char8 as BS
+import Control.Applicative
 
-main = print =<< (runCompM defaultCompState $ do
-  s <- io $ BS.getContents
-  e <- parse "" s
-  io $ pprint e
-  r <- typecheck GraphicTypes e
-  io $ debugPrint r)
+parseOpts :: [String] -> ([String], [String])
+parseOpts args = partition looks_like_flag args
+    where
+      looks_like_flag ('-':_) = True
+      looks_like_flag _ = False
+
+main :: IO ()
+main = do
+  (_flags, others) <- parseOpts `fmap` getArgs
+  (src_name, s) 
+      <- case others of
+           [] -> (,) "stdin" <$> io BS.getContents
+           (fn:_) -> (,) fn <$> io (BS.readFile fn)
+  rslt <- runCompM defaultCompState $ do
+            e <- parse src_name s
+            io $ pprint e
+            r <- typecheck GraphicTypes e
+            io $ debugPrint r
+  case rslt of
+    Right _ -> return ()
+    Left err -> do
+      io $ pprint err

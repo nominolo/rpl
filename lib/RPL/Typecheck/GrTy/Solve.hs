@@ -1,25 +1,41 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE FlexibleContexts #-}
-module RPL.Typecheck.GrTy.Solve ( fastSolveOne, solve ) where
+module RPL.Typecheck.GrTy.Solve
+  ( solve, SolveOpts(..), defaultSolveOpts,
+    fastSolveOne )
+where
 
 import RPL.Typecheck.GrTy.Types
 import RPL.Typecheck.GrTy.Translate
 import RPL.Typecheck.GrTy.Constraint
 import RPL.Typecheck.GrTy.Unify ( unify )
 import RPL.Utils.Monads
-import RPL.Utils.Unique ( uniqueFromInt )
-import RPL.Utils.SrcLoc ( noSrcSpan )
-
-import qualified RPL.Syntax as Syn
-import qualified RPL.Names as Syn
 
 import Control.Applicative
 
+data SolveOpts = SolveOpts
+  { optDottySteps :: Bool
+    -- ^ Produce a dotty graph for each step.
+  , optDottyResult :: Bool
+    -- ^ Produce a dotty graph for the final result.
+  , optConstrType :: ConstrType
+    -- ^ Which type of constraint to generate for forall-expansion.
+  }
+
+defaultSolveOpts :: SolveOpts
+defaultSolveOpts = SolveOpts
+  { optDottySteps = False
+  , optDottyResult = False
+  , optConstrType = MLF
+  }
+
 fastSolveOne ::
-    (Applicative m, MonadIO m, MonadGen NodeId m, MonadError String m) => 
-    Env -> ConstraintStore -> ConstrEdge -> m ConstraintStore
-fastSolveOne env cs edge = do
+       (Applicative m, MonadIO m, MonadGen NodeId m,
+        MonadError String m) => 
+       SolveOpts -> Env -> ConstraintStore -> ConstrEdge
+    -> m ConstraintStore
+fastSolveOne opts env cs edge = do
   let n1 = cedge_from edge
       n2 = cedge_to edge
   -- TODO: better error message
@@ -27,38 +43,20 @@ fastSolveOne env cs edge = do
     Unify -> do unify env n1 n2
                 return cs
     Inst -> do decrForallCount n1
-               (cs', n') <- expandForall cs MLF edge
+               (cs', n') <- expandForall cs (optConstrType opts) edge
                unify env n' n2
                return cs'
 
-solve :: (Applicative m, MonadIO m, MonadGen NodeId m, MonadError String m) =>
-         Env -> ConstraintStore -> m ConstraintStore
-solve env cs_ = do
+solve :: (Applicative m, MonadIO m, MonadGen NodeId m,
+          MonadError String m) =>
+         SolveOpts -> Env -> ConstraintStore -> m ConstraintStore
+solve opts env cs_ = do
   let go _ cs | [] <- cstore_constraints cs = return cs
       go !n cs | (e:es) <- cstore_constraints cs = do
-        cs' <- fastSolveOne env (cs { cstore_constraints = es }) e
-        --liftIO $ dottyConstraints cs' ("step " ++ show (n :: Int))
+        cs' <- fastSolveOne opts env (cs { cstore_constraints = es }) e
+        when (optDottySteps opts) $ do
+          io $ dottyConstraints cs' ("step " ++ show (n :: Int))
         go (n + 1) cs'
   cs <- go (0::Int) cs_
-  liftIO $ dottyConstraints cs "final"
+  when (optDottyResult opts) $ io $ dottyConstraints cs "final"
   return cs
-
-sv1 :: IO ()
-sv1 = do
-  let x = Syn.Id (uniqueFromInt 2) "x"
-  let y = Syn.Id (uniqueFromInt 3) "y"
-  let u = noSrcSpan
-  let expr = Syn.ELam u (Syn.VarPat u x) $
-              Syn.ELam u (Syn.VarPat u y) $ 
-               Syn.EApp u (Syn.EVar u y) (Syn.EVar u x) 
-               -- \x y -> y x :: forall a. a -> (forall b. a -> b)
-  r <- runGTM $ do 
-         cs <- translate MLF [] expr
-         liftIO $ do 
-           dottyConstraints cs "initial"
-         cs' <- solve [] cs
-         liftIO $ do 
-           dottyConstraints cs' "final"
-           return ()
-  print r
-  return ()
