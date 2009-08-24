@@ -45,3 +45,5 @@ instance Pretty ErrorMessage where
         wrappingText "Multiple occurrences of pattern variables:" $$
         nest 4 (fsep (commaSep (map ppr vs)))
     WrongUserType str -> str
+    OtherError msg ->
+        text msg
