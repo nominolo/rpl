@@ -10,6 +10,7 @@ import RPL.Typecheck.GrTy.Solve
 
 import qualified RPL.Syntax as Syn
 import RPL.Type
+import RPL.Type.Tidy
 
 tcExpr :: SolveOpts -> ConstrType -> Syn.Expr -> IO (Either String Type)
 tcExpr opts ctype expr =
@@ -19,4 +20,4 @@ tcExpr opts ctype expr =
     let root_gen_node = cstore_root cstore'
     [root_type] <- nodeChildren root_gen_node
     expr_typ <- toType root_type
-    return expr_typ
+    return (tidyType basicNamesSupply expr_typ)

@@ -26,7 +26,7 @@ main = do
             e <- parse src_name s
             io $ pprint e
             r <- typecheck GraphicTypes e
-            io $ debugPrint r
+            io $ pprint r
   case rslt of
     Right _ -> return ()
     Left err -> do

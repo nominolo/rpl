@@ -41,6 +41,7 @@ Library
                               RPL.Parser
                               RPL.Syntax
                               RPL.Type
+                              RPL.Type.Tidy
                               RPL.BuiltIn
                               RPL.Typecheck.Monad
                               RPL.Typecheck.Subst
