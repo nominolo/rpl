@@ -47,8 +47,10 @@ type InverseChildrenBinders = IM.IntMap [(Int, BindingLabel, NodeSort, Node)]
 -- | A map from binder to bound nodes.
 inverseChildrenBinders :: (Applicative m, MonadIO m) =>
                           Node -> m InverseChildrenBinders
-inverseChildrenBinders node =
-  snd <$> (foldM go (IS.empty, IM.empty) =<< nodeChildren node)
+inverseChildrenBinders node = do
+  r <- isRoot node
+  node0 <- if r then return node else binderNode node
+  snd <$> (foldM go (IS.empty, IM.empty) =<< nodeChildren node0)
  where
    go (vis_,res_) n = do
      n_id <- nodeId n
