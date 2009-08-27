@@ -1,5 +1,7 @@
 -- | Utils for last wishes before dying.
-module RPL.Utils.Panic where
+module RPL.Utils.Panic 
+    ( panic, expectJust
+    , module RPL.Utils.Pretty ) where
 
 import RPL.Utils.Pretty
 
