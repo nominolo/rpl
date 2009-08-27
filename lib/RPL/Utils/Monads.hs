@@ -2,9 +2,9 @@
 module RPL.Utils.Monads 
   ( StrictStateErrorM, runStrictStateErrorM,
     MonadState(..), gets, modify,
-    MonadError(..), MonadIO(..),
+    MonadError(..), MonadIO(..), MonadReader(..), asks,
     StrictStateErrorT, runStrictStateErrorT,
-    MonadGen(..), StateT(..),
+    MonadGen(..), StateT(..), ReaderT(..),
     io,
     module Control.Applicative, when
   )
@@ -17,6 +17,7 @@ import Control.Monad.State.Class
 import Control.Monad.Error.Class
 import Control.Monad.Error.Class
 import Control.Monad.Trans.Cont
+import Control.Monad.Reader
 import Data.Supply
 import Control.Monad
 

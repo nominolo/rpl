@@ -1,6 +1,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -- | Main interface to the compiler.
-module RPL.Compiler where
+module RPL.Compiler 
+  ( CompEnv(..), SolveOpts(..), defaultCompEnv, defaultCompState,
+    runCompM, CompM,
+    parseFile, parse,
+    typecheck, TcMode(..)
+  )
+where
 
 import qualified RPL.Lexer as L
 import RPL.Parser
@@ -21,16 +27,26 @@ import Control.Applicative
 
 data CompState = CompState
 
+data CompEnv = CompEnv
+  { solveOpts :: SolveOpts
+  }
+
+defaultCompEnv :: CompEnv
+defaultCompEnv = CompEnv
+  { solveOpts = defaultSolveOpts
+  }
+
 defaultCompState :: CompState
 defaultCompState = CompState
 
-newtype CompM a = CompM (StrictStateErrorT CompState SourceError IO a)
+newtype CompM a =
+    CompM (ReaderT CompEnv (StrictStateErrorT CompState SourceError IO) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadError SourceError,
-            MonadState CompState)
+            MonadState CompState, MonadReader CompEnv)
 
-runCompM :: CompState -> CompM a -> IO (Either SourceError a)
-runCompM s0 (CompM act) = do
-  r <- runStrictStateErrorT act s0
+runCompM :: CompEnv -> CompState -> CompM a -> IO (Either SourceError a)
+runCompM env s0 (CompM act) = do
+  r <- runStrictStateErrorT (runReaderT act env) s0
   case r of
     Left err -> return (Left err)
     Right (a, _) -> return (Right a)
@@ -58,7 +74,8 @@ typecheck AlgorithmW expr = do
     Right (subst, t) ->
         return (apply subst t)
 typecheck GraphicTypes expr = do
-  r <- liftIO $ tcExpr defaultSolveOpts MLF expr
+  solveOpts_ <- asks solveOpts
+  r <- liftIO $ tcExpr solveOpts_ MLF expr
   case r of
     Right t -> return t
     Left msg -> throwError (SourceError noSrcSpan (OtherError msg))
