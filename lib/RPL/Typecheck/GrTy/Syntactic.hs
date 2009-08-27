@@ -12,6 +12,7 @@ import RPL.BuiltIn
 import qualified RPL.Syntax as Syn
 import RPL.Names
 import RPL.Utils.Unique ( uniqueFromInt )
+import RPL.Utils.Panic
 import qualified Data.IntMap as IM
 import qualified Data.Map as M
 import Data.List ( sortBy, find )
@@ -53,8 +54,9 @@ fromType user_type = do
       mapM (\n -> bindTo n (Just fn) Flex) [n1, n2]
       return (fn, free1 ++ free2)
           
-    translate env ty
-      | (Syn.TCon _ tc_id, args) <- Syn.viewTypeApp ty = do
+    translate env ty =
+      case Syn.viewTypeApp ty of
+        (Syn.TCon _ tc_id, args) -> do
           case lookupTyCon tc_id of
             Just tycon 
              | length args == tyConArity tycon -> do
@@ -64,6 +66,7 @@ fromType user_type = do
                  return (tcn, frees)
              | otherwise -> error "Arity mismatch"  -- XXX: implement kind checker
             _ -> error "Unknown type constructor"   -- TODO: error message
+        _ -> panic (text "Unknown application pattern")
 
     translateList _env [] = return ([], [])
     translateList env (t:ts) = do
@@ -118,11 +121,11 @@ toType :: (Applicative m, MonadIO m) => Node -> m Type
 toType node = do
   rpo <- reversePostOrder node
   rpo_map <- nodeToPostOrder rpo
-  bound_at <- inverseChildrenBinders node
+  bound_at <- rebind_to_root =<< inverseChildrenBinders node
   let go n = do
         n_id <- nodeId n
-
         let bound_at_n = 
+              -- lowest first
               -- in increasing reverse post-order (i.e. post-order)
               map snd . sortBy (comparing fst) $
                 [ (po, (l, n')) 
@@ -142,7 +145,12 @@ toType node = do
       binders n0 ((l,n):lns) !acc = do
         n_id <- nodeId n
         inl <- can_inline bound_at n0 l n
-        if inl then binders n0 lns acc else do
+
+        -- If we ca inline it we won't need to generate a binder, move on.
+        if inl then binders n0 lns acc
+
+         -- Otherwise, create a type variable and fill in 
+         else do
           TyVar tv <- nodeIdToTyVar n_id
           t' <- go n
           let is_rigid = case l of Rigid -> True; _ -> False
@@ -193,6 +201,21 @@ toType node = do
          let bound_here =
                [ n' | (_,_,_,n') <- fromMaybe [] (IM.lookup n_id bound_at) ]
          and <$> mapM (monomorphic bound_at) bound_here
+
+   -- We might have nodes that are bound above us at a generalisation
+   -- node -- rebind those to our root ('node'), so that we can see them.
+   --
+   -- This does not include nodes that are generalised at a higher
+   -- level, and are therefore monomorphic in this context.
+   rebind_to_root bound_at = do
+     gen_node_id <- nodeId =<< binderNode node
+     n_id <- nodeId node
+     let bound_at_gen = 
+           [ x
+           | Just bchildren <- [IM.lookup gen_node_id bound_at]
+           , x@(n,_,_,_) <- bchildren 
+           , n /= n_id ]
+     return $ IM.insertWith (++) n_id bound_at_gen bound_at 
 
 data Variance = Covariant | Contravariant deriving (Eq, Show)
 
