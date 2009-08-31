@@ -300,7 +300,7 @@ ppSort :: NodeSort -> String
 ppSort (TyConNode tc) = Syn.idString (Typ.tyConName tc)
 ppSort (TypeNode _)  = "T"
 ppSort Bot           = "v"
-ppSort (Forall loc _)    = "G" ++ pretty loc
+ppSort (Forall loc _)    = "G" ++ pretty (ppSpanRegion loc)
 
 
 dottyConstraints :: ConstraintStore -> String -> IO ()

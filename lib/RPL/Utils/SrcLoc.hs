@@ -131,6 +131,17 @@ instance Pretty SrcSpan where
         text f <> colon <> int l <> colon <> int c
     UnhelpfulSpan s -> text s
 
+ppSpanRegion :: SrcSpan -> PDoc 
+ppSpanRegion sp = case sp of
+    SrcSpanOneLine _ l c1 c2 _ _ ->
+        int l <> colon <> int c1 <> char '-' <> int c2
+    SrcSpanMultiLine _ l1 c1 l2 c2 _ _ ->
+        int l1 <> colon <> int c1 <> char '-'
+               <> int l2 <> colon <> int c2
+    SrcSpanPoint _ l c _ ->
+        int l <> colon <> int c
+    UnhelpfulSpan _ -> empty
+
 -- ** Constructing SrcSpans
 
 -- | Construct a source span from two [SrcLoc]s.
