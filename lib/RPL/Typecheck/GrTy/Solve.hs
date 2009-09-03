@@ -15,7 +15,9 @@ import RPL.Utils.Monads
 import Control.Applicative
 
 data SolveOpts = SolveOpts
-  { optDottySteps :: Bool
+  { optDottyInitial :: Bool
+    -- ^ Produce a dotty graph for the initial constraints.
+  , optDottySteps :: Bool
     -- ^ Produce a dotty graph for each step.
   , optDottyResult :: Bool
     -- ^ Produce a dotty graph for the final result.
@@ -25,7 +27,8 @@ data SolveOpts = SolveOpts
 
 defaultSolveOpts :: SolveOpts
 defaultSolveOpts = SolveOpts
-  { optDottySteps = False
+  { optDottyInitial = False
+  , optDottySteps = False
   , optDottyResult = False
   , optConstrType = MLF
   }
@@ -51,6 +54,7 @@ solve :: (Applicative m, MonadIO m, MonadGen NodeId m,
           MonadError String m) =>
          SolveOpts -> Env -> ConstraintStore -> m ConstraintStore
 solve opts env cs_ = do
+  when (optDottyInitial opts) $ io $ dottyConstraints cs_ "initial"
   let go _ cs | [] <- cstore_constraints cs = return cs
       go !n cs | (e:es) <- cstore_constraints cs = do
         cs' <- fastSolveOne opts env (cs { cstore_constraints = es }) e

@@ -24,6 +24,10 @@ parseFlags (f:fs) !env = parseFlags fs env'
       case f of
         "-ddump-final-graph" ->
           env{ solveOpts = (solveOpts env){ optDottyResult = True }}
+        "-ddump-steps" ->
+          env{ solveOpts = (solveOpts env){ optDottySteps = True }}
+        "-ddump-initial-graph" ->
+          env{ solveOpts = (solveOpts env){ optDottyInitial = True }}
         _ -> env
 
 main :: IO ()
