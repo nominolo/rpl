@@ -4,7 +4,7 @@
 module RPL.Typecheck.GrTy.Types 
   ( Node(..), NodeId(unNodeId), Permissions(..), BindingLabel(..),
     ForallUse, NodeSort(..), Bound(..), BoundInfo(..),  OldStruct(..),
-    NodeInfo(..), UnifyInfo(..), HistTree(..),
+    NodeInfo(..), UnifyInfo(..), HistTree(..), ForallOrigin(..),
     newNode, nodeId, nodeSort, nodeArity, nodeChildren, nodeInfo,
     isRoot, setBinder, getBinder, binderNode,  nodePermissions,
     fuse, nodesEqual, 
@@ -86,8 +86,16 @@ data NodeSort
   = TyConNode Typ.TyCon
   | TypeNode Typ.Type
   | Bot
-  | Forall SrcSpan ForallUse
+  | Forall ForallOrigin ForallUse
   deriving (Eq)
+
+data ForallOrigin
+  = FOSpan SrcSpan
+  | FOText String
+  deriving Eq
+
+instance Pretty ForallOrigin where
+  ppr _ = text ""
 
 instance Show NodeSort where
   show Bot = "_|_"
@@ -247,13 +255,14 @@ fuse keep@(Node ni1 os1) (Node ni2 os2) mb_bound = do
   liftIO $ UF.union os2 os1
 
 -- | Create a new forall node sort.
-newForallSort :: (Applicative m, MonadIO m) => SrcSpan -> m NodeSort
-newForallSort loc = Forall loc . ForallUse <$> liftIO (newRef 0)
+newForallSort :: (Applicative m, MonadIO m) =>
+                 ForallOrigin -> m NodeSort
+newForallSort orig = Forall orig . ForallUse <$> liftIO (newRef 0)
 
 newForallNode :: (Applicative m, MonadIO m, MonadGen NodeId m) => 
-                 SrcSpan -> [Node] -> m Node
-newForallNode loc children = do
-  fa <- newForallSort loc
+                 ForallOrigin -> [Node] -> m Node
+newForallNode orig children = do
+  fa <- newForallSort orig
   newNode fa children
 
 isForall :: (Applicative m, MonadIO m) => Node -> m Bool

@@ -109,7 +109,7 @@ constrain n1 n2 origin = do
 
 translate :: ConstrType -> Env -> Syn.Expr -> GTM ConstraintStore
 translate ct _env exp0 = do
-    f <- create_real_forall M.empty Nothing exp0
+    f <- create_real_forall M.empty Nothing exp0 (exprToOrig exp0)
     edges <- mapM inst_elim_mono =<< (reverse <$> gets st_edges)
     ex <- gets st_exists
     return (ConstraintStore { cstore_constraints = edges
@@ -120,9 +120,9 @@ translate ct _env exp0 = do
     --  mb_f -|<|- (forall >--< b)
     --  n <- translate_ vars f' f' e
     --  n =<= b
-    create_real_forall vars mb_f e = do
+    create_real_forall vars mb_f e role = do
       b <- newNode Bot []
-      f' <- newForallNode (Syn.exprSpan e) [b]
+      f' <- newForallNode role [b]
       f' `bindFlexiblyTo` mb_f
       when (isJust mb_f) $
         exists_ f'
@@ -130,10 +130,10 @@ translate ct _env exp0 = do
       fuse n b Nothing
       return f'
 
-    create_forall vars fbind f e = do
+    create_forall vars fbind f e role = do
       -- TODO: optimise degenerate cases
       b <- newNode Bot []
-      f' <- newForallNode (Syn.exprSpan e) [b]
+      f' <- newForallNode role [b]
       exists_ f'
       f' `bindFlexiblyTo` (Just f)
       let bndr = case ct of
@@ -168,7 +168,7 @@ translate ct _env exp0 = do
           res <- new_bound_node Bot []
           arr <- new_bound_node (TyConNode Typ.funTyCon) [arg, res]
           let vars' = M.insert var arg vars
-          f_body <- create_forall vars' fbind f body
+          f_body <- create_forall vars' fbind f body (exprToOrig body)
           constrain f_body res ()
           return arr
 
@@ -178,8 +178,8 @@ translate ct _env exp0 = do
           arr <- new_bound_node (TyConNode Typ.funTyCon) [arg, res]
           exists_ arr
           
-          ffun <- create_forall vars fbind f e1
-          farg <- create_forall vars fbind f e2
+          ffun <- create_forall vars fbind f e1 (exprToOrig e1)
+          farg <- create_forall vars fbind f e2 (exprToOrig e2)
 
           constrain farg arg ()
           constrain ffun arr ()
@@ -194,6 +194,7 @@ translate ct _env exp0 = do
 
         Syn.ELet _ (Syn.VarPat _ v) e1 e2 -> do
           f1 <- create_real_forall vars (Just f) e1
+                  (exprToOrig e1)
           let vars' = M.insert v f1 vars
           f2 <- translate_ vars' fbind f e2
           -- add l_expr_roots f1 (loc v)
@@ -201,7 +202,7 @@ translate ct _env exp0 = do
 
         Syn.EAnn _ e2 ty -> do
           co <- mkCoercion ty
-          f' <- newForallNode (Syn.typeSpan ty) [co]
+          f' <- newForallNode (exprToOrig e) [co]
           f' `bindFlexiblyTo` (Just f)
           co `bindFlexiblyTo` (Just f')
 
@@ -210,7 +211,7 @@ translate ct _env exp0 = do
           arr <- new_bound_node (TyConNode Typ.funTyCon) [arg, res]
           exists_ arr
           
-          farg <- create_forall vars fbind f e2
+          farg <- create_forall vars fbind f e2 (exprToOrig e2)
 
           constrain farg arg ()
           constrain f' arr ()
@@ -247,10 +248,20 @@ t1 = do
     Right _ -> return ()
   return ()
 
+
+exprToOrig :: Syn.Expr -> ForallOrigin
+exprToOrig (Syn.ELam _ _ _) = FOText "\\"
+exprToOrig (Syn.EApp _ _ _) = FOText "@"
+exprToOrig (Syn.EVar _ v) = FOText (pretty v)
+exprToOrig (Syn.ELit _ l) = FOText (pretty l)
+exprToOrig (Syn.EAnn _ _ t) = FOText ("::" ++ pretty t)
+exprToOrig (Syn.ELet _ (Syn.VarPat _ v) _ _) =
+  FOText (pretty v ++ "=")
+
 dumpConstraints :: ConstraintStore -> IO ()
 dumpConstraints st = do
    r_id <- nodeId (cstore_root st)
-   
+
 --    nodes <- trans_close (cstore_root st : cstore_existentials st) M.empty
 --    putStrLn . ("All: "++) . intercalate ", " =<< mapM ppNode (M.elems nodes)
 
@@ -300,8 +311,10 @@ ppSort :: NodeSort -> String
 ppSort (TyConNode tc) = Syn.idString (Typ.tyConName tc)
 ppSort (TypeNode _)  = "T"
 ppSort Bot           = "v"
-ppSort (Forall loc _)    = "G" ++ pretty (ppSpanRegion loc)
+ppSort (Forall orig _)    = ppOrig orig
 
+ppOrig (FOSpan loc) = pretty (ppSpanRegion loc)
+ppOrig (FOText t) = t
 
 dottyConstraints :: ConstraintStore -> String -> IO ()
 dottyConstraints cs title = do
