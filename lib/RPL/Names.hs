@@ -7,12 +7,16 @@ import RPL.Utils.Unique
 -- Testing
 import Test.QuickCheck
 import Data.Char ( ord, toUpper )
+import Data.Supply
 
 ------------------------------------------------------------------------
 
 -- | An identifier.
 data Id = Id !Unique String
   deriving (Eq, Show, Ord)
+
+mkId :: Supply Unique -> String -> Id
+mkId s n = Id (supplyValue s) n
 
 idString :: Id -> String
 idString (Id _ n) = n

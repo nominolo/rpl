@@ -2,7 +2,7 @@ module RPL.Test.Parser where
 
 import RPL.Test.TestUtils
 
-import RPL.Syntax
+import RPL.Syntax hiding ( mkId )
 import RPL.Lexer hiding ( main )
 import RPL.Parser
 import RPL.Utils.SrcLoc

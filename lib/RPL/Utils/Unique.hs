@@ -1,17 +1,21 @@
 module RPL.Utils.Unique (
   Unique,
-  uniqueFromInt, intFromUnique
+  uniqueFromInt, intFromUnique, newUniqueSupply
 ) where
 
 import RPL.Utils.Pretty
 
 import Data.Array.Unboxed
+import Data.Supply
 
 newtype Unique = Unique Int
   deriving (Eq, Ord, Show)
 
 instance Pretty Unique where
   ppr (Unique u) = text (toBaseXString u)
+
+newUniqueSupply :: IO (Supply Unique)
+newUniqueSupply = newSupply (Unique 1) (\(Unique n) -> Unique (n + 1))
 
 uniqueFromInt :: Int -> Unique
 uniqueFromInt n = Unique n
