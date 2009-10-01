@@ -117,7 +117,7 @@ cleanUpForUser ty =
 instance HasTySubst Type where
   apply s t@(TyVar i) =
     case s !! i of
-      Just t' -> t'
+      Just t' -> apply s t'
       Nothing -> t
   apply _s t@(TyCon _) = t
   apply s (TyApp t1 t2) = TyApp (apply s t1) (apply s t2)
@@ -160,6 +160,10 @@ envElems (Env m) = M.elems m
 
 instance HasTySubst t => HasTySubst (Env i t) where
   apply s (Env m) = Env (M.map (apply s) m)
+
+instance (Pretty i, Pretty t) => Pretty (Env i t) where
+  ppr (Env m) = braces $ fsep . punctuate comma . map pp_one $ M.toList m
+    where pp_one (i, t) = ppr i <+> colon <+> ppr t
 
 ------------------------------------------------------------------------
 
