@@ -18,6 +18,7 @@ import RPL.Utils.Monads
 import RPL.Typecheck.AlgorithmW
 import RPL.Typecheck.Subst ( apply )
 import RPL.Typecheck.GrTy
+import qualified RPL.Typecheck.J as J
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import System.FilePath
@@ -66,6 +67,7 @@ parse src_name src_code = do
 data TcMode
   = AlgorithmW
   | GraphicTypes
+  | AlgorithmJ
 
 typecheck :: TcMode -> Syn.Expr -> CompM Type
 typecheck AlgorithmW expr = do
@@ -79,3 +81,7 @@ typecheck GraphicTypes expr = do
   case r of
     Right t -> return t
     Left msg -> throwError (SourceError noSrcSpan (OtherError msg))
+typecheck AlgorithmJ expr = do
+  case J.runJM (J.tcProgram expr) of
+    Left err -> throwError err
+    Right t -> return t
