@@ -1,2 +1,1 @@
--- comment
-let x = 42 in \y -> (\z -> x)
+42
