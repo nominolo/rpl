@@ -45,3 +45,4 @@ basicNamesSupply_ :: Supply [Id]
 basicNamesSupply_ = unsafePerformIO $ newSupply names tail
   where
     names = zipWith Id (map uniqueFromInt [100..]) simpleNames
+{-# NOINLINE basicNamesSupply_ #-}
