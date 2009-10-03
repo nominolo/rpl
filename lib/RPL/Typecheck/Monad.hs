@@ -23,7 +23,7 @@ import Data.Supply
 class (Applicative m, Monad m) => IdGen m where genId :: String -> m Id
 
 newtype TcM a = TcM { unTcM :: StrictStateErrorM (Int, Map String Int) SourceError a }
-  deriving (Functor, Applicative, Monad)
+  deriving (Functor, Applicative, Monad, MonadError SourceError)
 
 runTcM :: TcM a -> Either SourceError a
 runTcM m = runStrictStateErrorM (unTcM m) (100, M.empty)

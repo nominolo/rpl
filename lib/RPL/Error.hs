@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 -- | Error codes and such.
 --
 module RPL.Error where
@@ -6,6 +7,8 @@ import RPL.Names
 import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
 
+import Control.Monad.Error.Class ( Error, MonadError(..) )
+
 ------------------------------------------------------------------------
 -- FIXME: Use extensible data type. 
 
@@ -13,6 +16,8 @@ data SourceError
   = SourceError { errSpan :: SrcSpan
                 , errMsg  :: ErrorMessage }
   deriving (Eq, Show)
+
+instance Error SourceError
 
 data ErrorMessage
   = LexicalError
@@ -23,6 +28,10 @@ data ErrorMessage
   | WrongUserType PDoc
   | OtherError String
   deriving (Eq, Show)
+
+throwMsg :: MonadError SourceError m =>
+            SrcSpan -> ErrorMessage -> m a
+throwMsg sp msg = throwError (SourceError sp msg)
 
 ------------------------------------------------------------------------
 
