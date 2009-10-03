@@ -149,6 +149,9 @@ colon _ = P.colon
 wrappingText :: String -> PDoc
 wrappingText msg = fsep $ map text $ words msg
 
+textWords :: String -> [PDoc]
+textWords msg = map text (words msg)
+
 ------------------------------------------------------------------------
 
 -- ** Terminal Styles
@@ -174,6 +177,9 @@ underline = ansiTermStyle "4"
 keyword :: String -> PDoc
 keyword = bold . text
 
+colour1 :: PDoc -> PDoc
+colour1 = ansiTermStyle "32"
+
 -- ** Style-specific Combinators
 
 ifDebugStyle :: PDoc -> PDoc
@@ -181,6 +187,8 @@ ifDebugStyle d sty@DebugStyle =
   ansiTermStyle "90" d sty
 ifDebugStyle _d _ = P.empty
 
+withDebugStyle :: PDoc -> PDoc
+withDebugStyle d _ = d DebugStyle
 
 -- ** Utils
 
