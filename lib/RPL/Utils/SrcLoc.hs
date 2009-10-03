@@ -75,6 +75,9 @@ dummyLoc = UnhelpfulLoc ""
 ------------------------------------------------------------------------
 -- * Source Regions
 
+class HasSpan a where
+  getSpan :: a -> SrcSpan
+
 -- | A range of text in the source code.
 --
 -- Think of the start and end locations to refer to the space in *between*
@@ -191,6 +194,8 @@ data Located e
         unLoc  :: e        -- ^ Extract wrapped element.
       }
   deriving (Show, Eq)
+
+instance HasSpan (Located a) where getSpan = getLoc
 
 instance Pretty e => Pretty (Located e) where
   ppr (L l e) = sep [char '{' <> ppr l <> char '}', ppr e]
