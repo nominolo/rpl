@@ -20,16 +20,44 @@ import qualified Data.Set as S
 import Data.Supply
 import Data.List ( foldl' )
 import System.IO.Unsafe ( unsafePerformIO )
+import Control.Monad.Error
+import Control.Monad.State
 
-data JState = JState { subst :: TySubst, freshs :: Supply Unique }
-data JEnv = JEnv 
+data JC = Uni Type Type
+
+instance Pretty JC where
+  ppr (Uni t1 t2) = ppr t1 <+> text "==" <+> ppr t2
+
+data JState = JState
+  { subst :: TySubst
+  , freshs :: Supply Unique
+  , constraints :: [(SrcSpan, JC)]
+  }
+
+emptyState :: JState
+emptyState = JState emptyTySubst testSupply []
+
+logConstr :: SrcSpan -> JC -> JM ()
+logConstr loc ctrt =
+  modify $ \st -> st { constraints = (loc, ctrt) : constraints st }
+
+logDumb :: Expr -> JM Type -> JM Type
+logDumb expr body =
+  exists "*" $ \b -> do
+  t <- body
+  let loc = exprSpan expr
+  -- TODO: really log *after* generating the body?
+  unify loc (TyVar b) t
+  return (TyVar b)
+
+data JEnv = JEnv
   { gblEnv :: TypeEnv
-   }
+  }
 
 type TypeEnv = Env Id TypeScheme
 type UVar = TyVar
 
-newtype JM a = JM { unJM :: ReaderT JEnv (StrictStateErrorM JState SourceError) a }
+newtype JM a = JM { unJM :: ReaderT JEnv (ErrorT SourceError (State JState)) a }
   deriving (Functor, Applicative, Monad,
             MonadState JState, MonadError SourceError, MonadReader JEnv)
 
@@ -38,8 +66,11 @@ testSupply = unsafePerformIO newUniqueSupply
 {-# NOINLINE testSupply #-}
 
 runJM :: JM a -> Either SourceError a
-runJM m =
-  runStrictStateErrorM (runReaderT (unJM m) (JEnv emptyEnv)) (JState emptyTySubst testSupply)
+runJM m = res
+  where
+    m1 = runReaderT (unJM m) (JEnv emptyEnv)
+    m2 = runErrorT m1
+    (res, _st) = runState m2 emptyState
 
 tcProgram :: Expr -> JM Type
 tcProgram e = do
@@ -48,28 +79,31 @@ tcProgram e = do
   return $ tidyType basicNamesSupply $ apply s t
 
 tcExpr :: Expr -> JM Type
+tcExpr expr = logDumb expr $ tc_expr tcExpr expr
 
-tcExpr (ELit _ lit) = return (litType lit)
+tc_expr :: (Expr -> JM Type) -> Expr -> JM Type
+tc_expr _self (ELit _ lit) = do
+  return (litType lit)
 
-tcExpr (EVar loc x) = do
+tc_expr _self (EVar loc x) = do
   scheme <- tcLookup loc x
   instantiate scheme
 
-tcExpr (ELam _ (VarPat loc x) e) =
+tc_expr self (ELam _ (VarPat loc x) e) =
   exists (idString x) $ \arg -> do
   let arg_t = TyVar arg
-  t <- withLocalBinding loc x (mkForall [] [] arg_t) $ tcExpr e
+  t <- withLocalBinding loc x (mkForall [] [] arg_t) $ self e
   return (arg_t .->. t)
 
-tcExpr (EApp loc e1 e2) = do
-  t1 <- tcExpr e1
-  t2 <- tcExpr e2
+tc_expr self (EApp loc e1 e2) = do
+  t1 <- self e1
+  t2 <- self e2
   exists "@" $ \res -> do
   unify loc t1 (t2 .->. res)
   return (TyVar res)
 
-tcExpr (ELet _ (VarPat loc x) e1 e2) = do
-  t1 <- tcExpr e1
+tc_expr self (ELet _ (VarPat loc x) e1 e2) = do
+  t1 <- self e1
   ts1 <- generalise t1
   withLocalBinding loc x ts1 $ do
     t2 <- tcExpr e2
@@ -119,11 +153,12 @@ exists nm body = do
   body uvar
 
 withLocalBinding :: SrcSpan -> Id -> TypeScheme -> JM a -> JM a
-withLocalBinding bind_site var ty_scheme body = do
+withLocalBinding _bind_site var ty_scheme body = do
   local (\env -> env { gblEnv = extendEnv (gblEnv env) var ty_scheme }) body
 
 unify :: SrcSpan -> Type -> Type -> JM ()
 unify site t1 t2 = do
+  logConstr site (Uni t1 t2)
   s <- gets subst
   case unify2 s t1 t2 of
     Left (t, t') -> tcError site (TypeMismatch (pretty t) (pretty t'))
