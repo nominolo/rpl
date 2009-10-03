@@ -63,25 +63,25 @@ parse src_name src_code = do
   case rslt of
     Left err -> throwError err
     Right parsed -> return parsed
-  
+
 data TcMode
   = AlgorithmW
   | GraphicTypes
   | AlgorithmJ
 
-typecheck :: TcMode -> Syn.Expr -> CompM Type
-typecheck AlgorithmW expr = do
+typecheck :: TcMode -> Syn.Program -> CompM Type
+typecheck AlgorithmW (Syn.Program _ expr) = do
   case runTcM (toplevelInfer expr) of
     Left err -> throwError err
     Right (subst, t) ->
         return (apply subst t)
-typecheck GraphicTypes expr = do
+typecheck GraphicTypes (Syn.Program _ expr) = do
   solveOpts_ <- asks solveOpts
   r <- liftIO $ tcExpr solveOpts_ MLF expr
   case r of
     Right t -> return t
     Left msg -> throwError (SourceError noSrcSpan (OtherError msg))
-typecheck AlgorithmJ expr = do
+typecheck AlgorithmJ (Syn.Program decls expr) = do
   case J.runJM (J.tcProgram expr) of
     Left err -> throwError err
     Right t -> return t

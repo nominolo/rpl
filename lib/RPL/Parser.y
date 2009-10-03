@@ -2,7 +2,7 @@
 -- ---------------------------------------------------------------------------
 {
 {-# OPTIONS_GHC -w #-}
-module RPL.Parser ( parseProgram, parseExpr, parseType, parsePat ) where
+module RPL.Parser ( parseProgram, parseExpr, parseType, parsePat, parseDecl ) where
 
 import RPL.Lexer
 import RPL.Syntax
@@ -20,8 +20,13 @@ import RPL.Utils.Unique
  '->'            { L _ TokRArrow }
  '('             { L _ TokOParen }
  ')'             { L _ TokCParen }
+ '{'             { L _ TokOBrace }
+ '}'             { L _ TokCBrace }
+ ';'             { L _ TokSemicolon }
  '::'            { L _ TokDblColon }
  'forall'        { L _ (TokVar "forall") }
+ 'data'          { L _ TokData }
+ 'where'         { L _ TokWhere }
 
 VARID            { L _ (TokVar _) }
 CONID            { L _ (TokCon _) }
@@ -33,17 +38,45 @@ INTEGER          { L _ (TokInt _) }
 %name parseExpr exp
 %name parseType ctyp
 %name parsePat pat
+%name parseDecl decl
 %tokentype { (Located Token) }
 %%
 
 -- * Main Entry Point
 
-program :: { Expr }
-        : exp            { $1 }
+program :: { Program }
+        : decls exp      { Program $1 $2 }
+
+-- * Declarations
+
+decls  :: { [Decl] }
+        : {- empty -}    { [] }
+        | decl decls     { $1 : $2 }
+
+decl   :: { Decl }
+        : 'data' con vars 'where' '{' datacon_decls '}'
+                         { let loc = getSpan $1 `combineSpans` getSpan $7 in
+                           let con_id = unLoc $2 in
+                           let vars = map unLoc $3 in
+                           DataDecl loc con_id vars $6 }
+
+datacon_decls :: { [DataConDecl] }
+  : datacon_decl         { [$1] }
+  | datacon_decl ';'
+    datacon_decls        { $1 : $3 }
+
+datacon_decl :: { DataConDecl }
+  : con '::' ctyp        { let con_id = unLoc $1 in
+                           let loc = getSpan $1 `combineSpans` getSpan $3 in
+                           DataConDecl loc con_id $3 }
 
 -- * Expressions
 
 -- ** Variables
+
+vars   :: { [Located Id] }
+        : {- empty -}     { [] }
+        | var vars        { $1 : $2 }
 
 var    :: { Located Id }
         : VARID          { let L s (TokVar n) = $1 in

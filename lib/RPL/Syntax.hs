@@ -15,7 +15,7 @@ module RPL.Syntax (
 ) where
 
 import RPL.Names
-import RPL.Utils.Pretty
+--import RPL.Utils.Pretty
 import RPL.Utils.SrcLoc
 import RPL.Utils.Panic
 
@@ -45,6 +45,52 @@ data Type
   | TFun SrcSpan Type Type
   | TAll SrcSpan Id Type
   deriving (Eq, Show)
+
+
+data Decl
+  = DataDecl SrcSpan Id [Id] [DataConDecl]
+    -- ^ A data type declaration:
+    -- 
+    -- > data Either a b where {
+    -- >   Left  :: a -> Either a b
+    -- >   Right :: b -> Either a b
+    -- 
+    -- The variables mentioned in the @data ...@ line are
+    -- automatically forall-quantified in the case alternatives.
+    -- 
+    -- Type constructors are polymorphic.  They enter the environment
+    -- like any other identifier.  In the above example this would be:
+    -- 
+    -- > { Left :: forall a b. a -> Either a b,
+    -- >   Right :: forall a b. b -> Either a b }
+    -- 
+    -- GADTs are currently not allowed.  In GADTs, the syntax
+    -- 
+    -- > data T a where
+    -- >   T1 :: Int -> T Bool
+    -- 
+    -- is just a shorthand for a local equality constraint:
+    -- 
+    -- > data T a where
+    -- >   T1 :: (a ~ Bool) => Int -> T a
+    -- 
+    -- Since we don't support equality constraints, we require that
+    -- the result type of a constructor declaration matches the form
+    -- of the @data@ line.
+
+-- | A type constructor definition (part of a data type declaration).
+-- 
+data DataConDecl = DataConDecl SrcSpan Id Type
+
+data Program = Program [Decl] Expr
+
+instance HasSpan Expr where getSpan = exprSpan
+instance HasSpan Type where getSpan = typeSpan
+instance HasSpan Decl where
+  getSpan (DataDecl s _ _ _) = s
+
+instance HasSpan DataConDecl where
+  getSpan (DataConDecl s _ _) = s
 
 -- | Return the source span of an expression.
 exprSpan :: Expr -> SrcSpan
@@ -87,12 +133,12 @@ mkApp fun (e:es) =
     let e' = EApp (exprSpan fun `combineSpans` exprSpan e) fun e in
     e' `seq` mkApp e' es
 
-type Program = Expr
-
 -- | A pattern.
 data Pat
   = VarPat SrcSpan Id -- ^ Single variable pattern.
   deriving (Eq, Show)
+
+instance HasSpan Pat where getSpan = patSpan
 
 -- | Return source span of a pattern.
 patSpan :: Pat -> SrcSpan
@@ -149,6 +195,23 @@ instance Pretty Type where
     TFun _ t1 t2 -> ppr t1 <+> text "->" <+> ppr t2
     TAll _ x t -> text "forall" <+> ppr x <> char '.' <+> ppr t
     TApp _ t1 t2 -> ppr t1 <+> ppr t2
+
+instance Pretty Decl where
+  ppr (DataDecl _ ty_name ty_args datacons) =
+     keyword "data" <+> ppr ty_name <+> hsep (map ppr ty_args) <+>
+     keyword "where" <+> char '{' $+$ nest 2 (pp (map ppr datacons))
+   where
+     pp [] = empty
+     pp [d] = d <+> char '}'
+     pp (d:ds) = d <> char ';' $+$ pp ds
+
+instance Pretty DataConDecl where
+  ppr (DataConDecl _ datacon ty) = 
+    ppr datacon <+> text "::" <+> ppr ty
+
+instance Pretty Program where
+  ppr (Program decls expr) =
+    vcat (map ppr decls) $+$ ppr expr
 
 -- Combine nested lambdas into one top-level lambda.  I.e.,
 --

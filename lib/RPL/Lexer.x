@@ -44,6 +44,9 @@ tokens :-
   "::"                            { \s _ -> return $ L s TokDblColon }
   "("                             { \s _ -> return $ L s TokOParen }
   ")"                             { \s _ -> return $ L s TokCParen }
+  "{"                             { \s _ -> return $ L s TokOBrace }
+  "}"                             { \s _ -> return $ L s TokCBrace }
+  ";"                             { \s _ -> return $ L s TokSemicolon }
   $lower [$alpha $digit \_ \']*   { \s t -> return $ L s (TokVar t) }
   $upper [$alpha $digit \_ \']*   { \s t -> return $ L s (TokCon t) }
   [\* \/ \+ \- \= \~ \^ \& \!]+   { \s t -> return $ L s (TokOper t) }
@@ -192,6 +195,9 @@ data Token
   | TokDblColon
   | TokOParen
   | TokCParen
+  | TokOBrace
+  | TokCBrace
+  | TokSemicolon
   | TokVar String
   | TokCon String
   | TokOper String
