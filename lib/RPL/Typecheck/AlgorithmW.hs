@@ -86,7 +86,7 @@ infer env (EAnn loc e ty) = do
     -- TODO: check for correctness
     (s1, t1) <- infer env e
     let most_general = generalise (freeTypeEnvVars $ apply s1 env) t1
-    user_scheme <- fromUserType ty
+    user_scheme <- fromUserType emptyEnv ty
     ok <- user_scheme `isInstanceOf` most_general
     if not ok then
       -- TODO: better error message

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module RPL.Typecheck.Utils where
 
 import Prelude hiding ( (!!) )
@@ -11,6 +12,7 @@ import qualified RPL.Syntax as Syn
 import RPL.BuiltIn
 import RPL.Utils.Pretty
 import RPL.Error
+import Control.Monad.Error.Class
 
 import Data.Maybe ( isJust )
 import qualified Data.Set as S
@@ -21,8 +23,9 @@ litType :: Lit -> Type
 litType (IntLit _) = TyCon typeInt
 litType (CharLit _) = TyCon typeChar
 
-fromUserType :: Syn.Type -> TcM TypeScheme
-fromUserType ty = do
+fromUserType :: (Applicative m, MonadError SourceError m) =>
+                Env Id TyCon -> Syn.Type -> m TypeScheme
+fromUserType ty_env ty = do
     (vars, rho) <- outer ty 
     return $ ForAll (map mkTyVar vars) [] rho
   where
@@ -32,16 +35,21 @@ fromUserType ty = do
     -- TODO: lookup the type constructor in the environment
     inner rho = case rho of
       Syn.TVar _ v    -> return $ TyVar (mkTyVar v)
-      Syn.TCon _ n    -> return $ TyCon (MkTyCon n 0)
+      Syn.TCon s n    -> 
+          case lookupEnv ty_env n of
+            Just tc -> return $ TyCon tc
+            Nothing -> unknown_tycon_error s n
       Syn.TApp _ t t' -> (@@) <$> inner t <*> inner t'
       Syn.TFun _ t t' -> (.->.) <$> inner t <*> inner t'
       Syn.TAll _s _v _t  ->
-          tcError (typeSpan ty) $ WrongUserType $
+          throwError $ SourceError (typeSpan ty) $ WrongUserType $
             wrappingText "User type annotation contains nested foralls:" $$
             text "Full type annotation:" $$
             nest 4 (ppr ty) $$
             text "Offending part:" $$
             nest 4 (ppr rho)
+
+    unknown_tycon_error s n = throwMsg s (NotInScope n)
 
 -- | Instantiate a type scheme by substituting all forall-qualified
 -- variables with fresh skolem variables.
