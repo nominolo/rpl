@@ -26,6 +26,7 @@ data ErrorMessage
   | TypeMismatch String String
   | MultiplePatVars [Id]
   | WrongUserType PDoc
+  | DeclError PDoc
   | OtherError String
   deriving (Eq, Show)
 
@@ -54,5 +55,6 @@ instance Pretty ErrorMessage where
         wrappingText "Multiple occurrences of pattern variables:" $$
         nest 4 (fsep (commaSep (map ppr vs)))
     WrongUserType str -> str
+    DeclError txt -> txt
     OtherError msg ->
         text msg

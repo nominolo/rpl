@@ -45,6 +45,7 @@ Library
                               RPL.BuiltIn
                               RPL.Typecheck.Monad
                               RPL.Typecheck.Subst
+                              RPL.Typecheck.Env
                               RPL.Typecheck.Unify
                               RPL.Typecheck.Utils
                               RPL.Typecheck.AlgorithmW
