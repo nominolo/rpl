@@ -2,6 +2,8 @@
 module RPL.Type 
   ( -- * Types
     Type(..), Term, (.->.), mkFun, ftv, Ctxt(..)
+    -- * Views
+  , viewFun, viewApp
   , -- * Type Constructors
     isInfixTyCon, tyConApp, TyCon(..), (@@)
     -- * Type Variables
@@ -129,8 +131,18 @@ mkFun []     = error "mkFun: expects at least one argument"
 mkFun [t]    = toType t
 mkFun (t:ts) = TyApp (TyApp typeFun (toType t)) (mkFun ts)
 
+-- | Inverse of 'mkFun'.
+viewFun :: Type -> [Type]
+viewFun (TyApp (TyApp c t1) t2) | c == typeFun = t1 : viewFun t2
+viewFun t = [t]
+
 tyConApp :: TyCon -> [Type] -> Type
 tyConApp tcon args = foldl' TyApp (TyCon tcon) args
+
+viewApp :: Type -> [Type]
+viewApp t = go t []
+  where go (TyApp t1 t2) acc = go t1 (t2:acc)
+        go t1 acc = (t1 : acc)
 
 -- ** Free Variables
 

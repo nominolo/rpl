@@ -32,6 +32,10 @@ tests = [ testGroup "typecheck" $
   , testCase "mkFun/2" $ runTcM' $ do
       [a,b,c] <- mapM freshTyVar ["a", "b", "c"]
       return $ mkFun [a, b, c] @?= (a .->. (b .->. c))
+  , testCase "viewFun/1" $ runTcM' $ do
+      [a,b,c] <- mapM freshTyVar ["a", "b", "c"]
+      return $ viewFun (mkFun [a, b, c]) @?= (map TyVar [a, b, c])
+
   , testCase "TyApp assoc" $ runTcM' $ do
       [a,b,c] <- mapM freshTyVar ["a", "b", "c"]
       return $ a @@ b @@ c @?= (a @@ b) @@ c
