@@ -25,6 +25,13 @@ type NameEnv = Env Id TypeScheme
 emptyGlobalEnv :: GlobalEnv
 emptyGlobalEnv = GlobalEnv initialTypeEnv emptyEnv
 
+extendNameEnv :: GlobalEnv -> Id -> TypeScheme -> GlobalEnv
+extendNameEnv env x ts =
+  env { gblNameEnv = extendEnv (gblNameEnv env) x ts }
+
+lookupNameEnv :: GlobalEnv -> Id -> Maybe TypeScheme
+lookupNameEnv env x = lookupEnv (gblNameEnv env) x
+
 -- newtype CheckM a = CheckM (ErrorT SourceError IO a)
 --   deriving (Functor, Applicative, Monad, MonadError SourceError)
 

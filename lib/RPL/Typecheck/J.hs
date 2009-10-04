@@ -3,6 +3,7 @@
 module RPL.Typecheck.J where
 
 import RPL.Typecheck.Subst
+import RPL.Typecheck.Env
 import RPL.Typecheck.Unify hiding ( unify )
 import RPL.Typecheck.Utils hiding ( instantiate )
 
@@ -51,9 +52,11 @@ logDumb expr body =
   return (TyVar b)
 
 data JEnv = JEnv
-  { gblEnv :: TypeEnv
+  { gblEnv :: GlobalEnv
+  , lclEnv :: LocalEnv
   }
 
+type LocalEnv = Env Id Type
 type TypeEnv = Env Id TypeScheme
 type UVar = TyVar
 
@@ -68,15 +71,16 @@ testSupply = unsafePerformIO newUniqueSupply
 runJM :: JM a -> Either SourceError a
 runJM m = res
   where
-    m1 = runReaderT (unJM m) (JEnv emptyEnv)
+    m1 = runReaderT (unJM m) (JEnv emptyGlobalEnv emptyEnv)
     m2 = runErrorT m1
     (res, _st) = runState m2 emptyState
 
-tcProgram :: Expr -> JM Type
-tcProgram e = do
-  t <- tcExpr e
-  s <- gets subst
-  return $ tidyType basicNamesSupply $ apply s t
+tcProgram :: GlobalEnv -> Expr -> JM Type
+tcProgram gbl_env e =
+  local (\_ -> JEnv gbl_env emptyEnv) $ do
+    t <- tcExpr e
+    s <- gets subst
+    return $ tidyType basicNamesSupply $ apply s t
 
 tcExpr :: Expr -> JM Type
 tcExpr expr = logDumb expr $ tc_expr tcExpr expr
@@ -92,7 +96,7 @@ tc_expr _self (EVar loc x) = do
 tc_expr self (ELam _ (VarPat loc x) e) =
   exists (idString x) $ \arg -> do
   let arg_t = TyVar arg
-  t <- withLocalBinding loc x (mkForall [] [] arg_t) $ self e
+  t <- extendLocalEnv loc x arg_t $ self e
   return (arg_t .->. t)
 
 tc_expr self (EApp loc e1 e2) = do
@@ -105,7 +109,7 @@ tc_expr self (EApp loc e1 e2) = do
 tc_expr self (ELet _ (VarPat loc x) e1 e2) = do
   t1 <- self e1
   ts1 <- generalise t1
-  withLocalBinding loc x ts1 $ do
+  extendGlobalEnv loc x ts1 $ do
     t2 <- tcExpr e2
     return t2
 
@@ -120,10 +124,10 @@ instantiate (ForAll qtvs0 [] ty) = go emptyTySubst qtvs0
 generalise :: Type -> JM TypeScheme
 generalise ty = do
   s <- gets subst
-  env <- asks gblEnv
+  lcl_env <- asks lclEnv
   -- FIXME: Make more efficient.  Idea 1: Only unification variables
   -- can be quantified over.
-  return $ generalise' (freeTypeEnvVars (apply s env)) (apply s ty)
+  return $ generalise' (freeTypeEnvVars (apply s lcl_env)) (apply s ty)
 
 -- | Turn a type into a type scheme abstracting over all free vars.
 -- 
@@ -140,8 +144,9 @@ generalise' monos t =
    mkForall (S.toList (ftv t `S.difference` monos)) [] t
 
 
-freeTypeEnvVars :: TypeEnv -> S.Set TyVar
-freeTypeEnvVars env = foldl' S.union S.empty (map tsFTV (envElems env))
+freeTypeEnvVars :: LocalEnv -> S.Set TyVar
+freeTypeEnvVars lcl_env =
+  foldl' S.union S.empty (map ftv (envElems lcl_env))
 
 
 exists :: String -> (UVar -> JM a) -> JM a
@@ -152,9 +157,13 @@ exists nm body = do
   modify $ \st -> st { freshs = s2 }
   body uvar
 
-withLocalBinding :: SrcSpan -> Id -> TypeScheme -> JM a -> JM a
-withLocalBinding _bind_site var ty_scheme body = do
-  local (\env -> env { gblEnv = extendEnv (gblEnv env) var ty_scheme }) body
+extendGlobalEnv :: SrcSpan -> Id -> TypeScheme -> JM a -> JM a
+extendGlobalEnv _bind_site var ty_scheme body = do
+  local (\env -> env { gblEnv = extendNameEnv (gblEnv env) var ty_scheme }) body
+
+extendLocalEnv :: SrcSpan -> Id -> Type -> JM a -> JM a
+extendLocalEnv _bind_site var ty body =
+  local (\env -> env { lclEnv = extendEnv (lclEnv env) var ty }) body
 
 unify :: SrcSpan -> Type -> Type -> JM ()
 unify site t1 t2 = do
@@ -166,10 +175,14 @@ unify site t1 t2 = do
 
 tcLookup :: SrcSpan -> Id -> JM TypeScheme
 tcLookup loc var = do
-  env <- asks gblEnv
-  case lookupEnv env var of
-    Nothing -> tcError loc (NotInScope var)
-    Just s -> return s
+  lcl_env <- asks lclEnv
+  case lookupEnv lcl_env var of
+    Just ty -> return (mkForall [] [] ty)
+    Nothing -> do
+      gbl_env <- asks gblEnv
+      case lookupNameEnv gbl_env var of
+        Just ty_scheme -> return ty_scheme
+        Nothing -> tcError loc (NotInScope var)
 
 tcError :: SrcSpan -> ErrorMessage -> JM a
 tcError loc msg = throwError (SourceError loc msg)

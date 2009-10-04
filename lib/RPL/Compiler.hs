@@ -15,6 +15,7 @@ import RPL.Type
 import RPL.Error
 import RPL.Utils.SrcLoc
 import RPL.Utils.Monads
+import RPL.Typecheck.Env
 import RPL.Typecheck.AlgorithmW
 import RPL.Typecheck.Subst ( apply )
 import RPL.Typecheck.GrTy
@@ -82,6 +83,7 @@ typecheck GraphicTypes (Syn.Program _ expr) = do
     Right t -> return t
     Left msg -> throwError (SourceError noSrcSpan (OtherError msg))
 typecheck AlgorithmJ (Syn.Program decls expr) = do
-  case J.runJM (J.tcProgram expr) of
+  env0 <- checkDecls decls
+  case J.runJM (J.tcProgram env0 expr) of
     Left err -> throwError err
     Right t -> return t
