@@ -120,6 +120,7 @@ aexp   :: { Expr }
      : var                          { let v = unLoc $1 in
                                       let s = getLoc $1 in
                                       EVar s v }
+     | con                          { EVar (getLoc $1) (unLoc $1) }
      | literal                      { let l = unLoc $1 in
                                       let s = getLoc $1 in
                                       ELit s l }
