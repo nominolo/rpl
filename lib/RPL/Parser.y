@@ -45,25 +45,25 @@ INTEGER          { L _ (TokInt _) }
 -- * Main Entry Point
 
 program :: { Program }
-        : decls exp      { Program $1 $2 }
+        : decls exp      { Program (reverse $1) $2 }
 
 -- * Declarations
 
 decls  :: { [Decl] }
         : {- empty -}    { [] }
-        | decl decls     { $1 : $2 }
+        | decls decl     { $2 : $1 }
 
 decl   :: { Decl }
         : 'data' con vars 'where' '{' datacon_decls '}'
                          { let loc = getSpan $1 `combineSpans` getSpan $7 in
                            let con_id = unLoc $2 in
-                           let vars = map unLoc $3 in
-                           DataDecl loc con_id vars $6 }
+                           let vars = map unLoc (reverse $3) in
+                           DataDecl loc con_id vars (reverse $6) }
 
 datacon_decls :: { [DataConDecl] }
   : datacon_decl         { [$1] }
-  | datacon_decl ';'
-    datacon_decls        { $1 : $3 }
+  | datacon_decls ';'
+    datacon_decl         { $3 : $1 }
 
 datacon_decl :: { DataConDecl }
   : con '::' ctyp        { let con_id = unLoc $1 in
@@ -76,7 +76,7 @@ datacon_decl :: { DataConDecl }
 
 vars   :: { [Located Id] }
         : {- empty -}     { [] }
-        | var vars        { $1 : $2 }
+        | vars var        { $2 : $1 }
 
 var    :: { Located Id }
         : VARID          { let L s (TokVar n) = $1 in
@@ -108,7 +108,7 @@ exp10  :: { Expr }
                                       let s2 = exprSpan $6 in
                                       let s = combineSpans s1 s2 in
                                       ELet s $2 $4 $6 }
-     | '\\' pats '->' exp           { mkLam (getLoc $1) $2 $4 }
+     | '\\' pats '->' exp           { mkLam (getLoc $1) (reverse $2) $4 }
      | fexp                         { $1 }
 
 fexp   :: { Expr }
@@ -130,7 +130,7 @@ aexp   :: { Expr }
 
 pats :: { [Pat] }
      : {- empty -}                  { [] }
-     | pat pats                     { $1 : $2 }
+     | pats pat                     { $2 : $1 }
 
 pat :: { Pat }
      : var                          { let v = unLoc $1 in
