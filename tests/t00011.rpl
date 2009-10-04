@@ -1,0 +1,8 @@
+data Pair a b where {
+  Pair :: a -> b -> Pair a b }
+
+data Maybe a where {
+  Nothing :: Maybe a;
+  Just :: a -> Maybe a }
+
+42

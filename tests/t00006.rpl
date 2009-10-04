@@ -1,0 +1,10 @@
+data Pair a b where { Pair :: a -> b -> Pair a b }
+data Triple a b c where { Triple :: a -> b -> c -> Triple a b c }
+data Bool where { False :: Bool; True :: Bool }
+let k = \z ->
+  let h = \w -> Pair w z in
+  let f = \x ->
+    let g = \y -> Pair x y in
+    Triple (g 1) (g True) (h 3)
+  in f z
+in k

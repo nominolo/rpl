@@ -1,0 +1,2 @@
+data T a where { C :: a -> X a }
+42

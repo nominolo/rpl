@@ -1,0 +1,3 @@
+data T a where { C :: T a }
+data U a where { D :: T a }
+42
