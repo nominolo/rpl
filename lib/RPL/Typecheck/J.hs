@@ -13,18 +13,18 @@ import RPL.Syntax hiding ( Type(..) )
 import RPL.Error
 import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
---import RPL.BuiltIn
+import RPL.BuiltIn
 import RPL.Utils.Monads
 import RPL.Utils.Unique
 
 import qualified Data.Set as S
 import Data.Supply
-import Data.List ( foldl' )
+import Data.List ( foldl', delete, unfoldr )
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad.Error
 import Control.Monad.State
 
-data JC = Uni Type Type
+data JC = Uni Type Type deriving Eq
 
 instance Pretty JC where
   ppr (Uni t1 t2) = ppr t1 <+> text "==" <+> ppr t2
@@ -34,6 +34,9 @@ data JState = JState
   , freshs :: Supply Unique
   , constraints :: [(SrcSpan, JC)]
   }
+
+instance Pretty JState where
+  ppr s = ppr (subst s)
 
 emptyState :: JState
 emptyState = JState emptyTySubst testSupply []
@@ -75,6 +78,14 @@ runJM m = res
     m2 = runErrorT m1
     (res, _st) = runState m2 emptyState
 
+execJM :: JM a -> (Either SourceError a, JState)
+execJM m = (res, st)
+  where
+    m1 = runReaderT (unJM m) (JEnv emptyGlobalEnv emptyEnv)
+    m2 = runErrorT m1
+    (res, st) = runState m2 emptyState
+
+
 tcProgram :: GlobalEnv -> Expr -> JM Type
 tcProgram gbl_env e =
   local (\_ -> JEnv gbl_env emptyEnv) $ do
@@ -83,7 +94,11 @@ tcProgram gbl_env e =
     return $ tidyType basicNamesSupply $ apply s t
 
 tcExpr :: Expr -> JM Type
-tcExpr expr = logDumb expr $ tc_expr tcExpr expr
+tcExpr expr = do
+--  callCC $ \k -> do   -- k :: Type -> JM Type a
+  -- calling k 
+  tc_expr tcExpr expr
+--logDumb expr $ tc_expr tcExpr expr
 
 tc_expr :: (Expr -> JM Type) -> Expr -> JM Type
 tc_expr _self (ELit _ lit) = do
@@ -96,7 +111,8 @@ tc_expr _self (EVar loc x) = do
 tc_expr self (ELam _ (VarPat loc x) e) =
   exists (idString x) $ \arg -> do
   let arg_t = TyVar arg
-  t <- extendLocalEnv loc x arg_t $ self e
+  t <- extendLocalEnv loc x arg_t $
+         self e
   return (arg_t .->. t)
 
 tc_expr self (EApp loc e1 e2) = do
@@ -110,7 +126,7 @@ tc_expr self (ELet _ (VarPat loc x) e1 e2) = do
   t1 <- self e1
   ts1 <- generalise t1
   extendGlobalEnv loc x ts1 $ do
-    t2 <- tcExpr e2
+    t2 <- self e2
     return t2
 
 instantiate :: TypeScheme -> JM Type
@@ -186,3 +202,104 @@ tcLookup loc var = do
 
 tcError :: SrcSpan -> ErrorMessage -> JM a
 tcError loc msg = throwError (SourceError loc msg)
+
+----------------------------------------------------------------------
+
+-- | Find /a/ minimal unsatisfiable subset of the input constraints.
+-- 
+-- Returns:
+-- 
+--  * @[]@ the input constraints are consistent.
+-- 
+--  * @s@ the input constraints are unsatisfiable and @s@ is a minimal
+--    unsatisfiable set.  I.e., removing any element of @s@ makes it
+--    satisfiable.
+-- 
+minUnsat :: [(SrcSpan, JC)] -> [(SrcSpan, JC)]
+minUnsat cs0 = go emptyTySubst [] cs0
+  where
+    -- INVARIANT:
+    --   constraintUnifier emptyTySubst min_approx == min_unif
+    go min_unif min_approx not_tried =
+      case constraintUnifier min_unif not_tried of
+        Left c@(_, Uni t1 t2) ->
+          -- c is in the minimal set; check whether adding @c@ would
+          -- make the minimal set inconsistent
+          case unify2 min_unif t1 t2 of
+            Left _ ->
+              -- yep, inconsistent.  We're done
+              c : min_approx
+            Right min_unif' ->
+              go min_unif' (c : min_approx) (delete c not_tried)
+        Right _ -> 
+          -- adding all constraints succeeds => the input set was
+          -- consistent
+          []
+
+-- | Find (most general) unifier for the given constraints.
+-- 
+-- Returns:
+-- 
+--  * @Right s <=>@ all constraints are consistent and @s@ is the most
+--    general unifier.
+-- 
+--  * @Left c <=>@ constraints conflict and @c@ introduced the
+--    conflict.  I.e., if the input constraints were:
+-- 
+--    > c_1, .., c_k, c_k+1, .., c_n
+-- 
+--    and the result is @Left c_k+1@, then the constraints @c_1, ..,
+--    c_k@ were consistent, but adding @c_k+1@ introduced an
+--    inconsistency.
+-- 
+constraintUnifier :: TySubst -> [(l, JC)] 
+                  -> Either (l, JC) TySubst
+constraintUnifier s [] = Right s
+constraintUnifier s (c@(_, Uni t1 t2) : cs) =
+  case unify2 s t1 t2 of
+    Left _ -> Left c
+    Right s' -> constraintUnifier s' cs
+
+
+
+tst1 :: IO ()
+tst1 = do
+  s <- newUniqueSupply
+  let locs = unfoldr (\l -> let l' = advanceSrcLoc l ' ' in
+                            Just (mkSrcSpan l l', l'))
+                     (startLoc "")
+  let l1:l2:l3:l4:l5:l6:l7:_ = locs
+  let names = zipWith mkId (split s) simpleNames
+  let a:b:c:d:e:f:g:_ = map (TyVar . mkTyVar) names
+  let tChar = TyCon typeChar
+  let tInt = TyCon typeInt
+  let cs = [ (l1, Uni a tChar), (l2, Uni b g), (l3, Uni e tInt),
+             (l4, Uni f tInt), (l5, Uni g (e .->. f)),
+             (l6, Uni b (a .->. c)), (l7, Uni c d) ]
+  pprint $ minUnsat cs
+  return ()
+
+tc2 :: (Type -> JM b) -> (Expr -> JM Type) -> Expr -> JM b
+tc2 k _ (ELit _ lit) = k (litType lit)
+tc2 k _ (EVar loc x) = do
+  scheme <- tcLookup loc x
+  t <- instantiate scheme
+  k t
+tc2 k self (ELam _ (VarPat loc x) e) = do
+  exists (idString x) $ \arg -> do
+  let arg_t = TyVar arg
+  t <- extendLocalEnv loc x arg_t $
+         self e
+  k (arg_t .->. t)
+tc2 k self (EApp loc e1 e2) = do
+  t1 <- self e1
+  t2 <- self e2
+  exists "@" $ \res -> do
+  unify loc t1 (t2 .->. res)
+  k (TyVar res)
+
+tst2 :: String
+tst2 = pretty $
+  execJM $ do
+    let mkdummy = (\_ -> exists "%" $ \b -> return (TyVar b))
+    tc_expr mkdummy (EApp noSrcSpan undefined undefined)
