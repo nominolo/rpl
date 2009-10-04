@@ -1,7 +1,7 @@
 Name:            rpl-testsuite
 Version:         0.1
 License:         BSD3
-License-File:    ../LICENSE
+License-File:    ../doc/LICENSE
 Author:          Thomas Schilling <nominolo@googlemail.com>
 Maintainer:      Thomas Schilling <nominolo@googlemail.com>
 Homepage:        http://github.com/nominolo/rpl
