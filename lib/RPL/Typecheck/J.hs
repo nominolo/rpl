@@ -7,6 +7,7 @@ import RPL.Typecheck.Subst
 import RPL.Typecheck.Env
 import RPL.Typecheck.Unify hiding ( unify )
 import RPL.Typecheck.Utils hiding ( instantiate )
+import RPL.Typecheck.Minimise
 
 import RPL.Type
 import RPL.Type.Tidy
@@ -20,7 +21,7 @@ import RPL.Utils.Unique
 
 import qualified Data.Set as S
 import Data.Supply
-import Data.List ( foldl', delete, unfoldr )
+import Data.List ( foldl', unfoldr )
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad.Error
 import Control.Monad.State
@@ -217,62 +218,12 @@ tcError loc msg = throwError (SourceError loc msg)
 
 ----------------------------------------------------------------------
 
--- | Find /a/ minimal unsatisfiable subset of the input constraints.
--- 
--- Returns:
--- 
---  * @[]@ the input constraints are consistent.
--- 
---  * @s@ the input constraints are unsatisfiable and @s@ is a minimal
---    unsatisfiable set.  I.e., removing any element of @s@ makes it
---    satisfiable.
--- 
-minUnsat :: [(SrcSpan, JC)] -> [(SrcSpan, JC)]
-minUnsat cs0 = go emptyTySubst [] cs0
+min_unsat :: [JC] -> [JC]
+min_unsat cs = M.elems out
   where
-    -- INVARIANT:
-    --   constraintUnifier emptyTySubst min_approx == min_unif
-    go min_unif min_approx not_tried =
-      case constraintUnifier min_unif not_tried of
-        Left c@(_, Uni t1 t2) ->
-          -- c is in the minimal set; check whether adding @c@ would
-          -- make the minimal set inconsistent
-          case unify2 min_unif t1 t2 of
-            Left _ ->
-              -- yep, inconsistent.  We're done
-              c : min_approx
-            Right min_unif' ->
-              go min_unif' (c : min_approx) (delete c not_tried)
-        Right _ -> 
-          -- adding all constraints succeeds => the input set was
-          -- consistent
-          []
-
--- | Find (most general) unifier for the given constraints.
--- 
--- Returns:
--- 
---  * @Right s <=>@ all constraints are consistent and @s@ is the most
---    general unifier.
--- 
---  * @Left c <=>@ constraints conflict and @c@ introduced the
---    conflict.  I.e., if the input constraints were:
--- 
---    > c_1, .., c_k, c_k+1, .., c_n
--- 
---    and the result is @Left c_k+1@, then the constraints @c_1, ..,
---    c_k@ were consistent, but adding @c_k+1@ introduced an
---    inconsistency.
--- 
-constraintUnifier :: TySubst -> [(l, JC)] 
-                  -> Either (l, JC) TySubst
-constraintUnifier s [] = Right s
-constraintUnifier s (c@(_, Uni t1 t2) : cs) =
-  case unify2 s t1 t2 of
-    Left _ -> Left c
-    Right s' -> constraintUnifier s' cs
-
-
+    out = minUnsat emptyTySubst solve inp
+    inp = M.fromList $ zip [(1::Int)..] cs
+    solve s _ (Uni t1 t2) = unify2 s t1 t2
 
 tst1 :: IO ()
 tst1 = do
@@ -285,30 +236,13 @@ tst1 = do
   let a:b:c:d:e:f:g:_ = map (TyVar . mkTyVar) names
   let tChar = TyCon typeChar
   let tInt = TyCon typeInt
-  let cs = [ (l1, Uni a tChar), (l2, Uni b g), (l3, Uni e tInt),
+  let cs = map snd
+           [ (l1, Uni a tChar), (l2, Uni b g), (l3, Uni e tInt),
              (l4, Uni f tInt), (l5, Uni g (e .->. f)),
              (l6, Uni b (a .->. c)), (l7, Uni c d) ]
-  pprint $ minUnsat cs
+  -- min: [a == Char, b == g, e == Int, g == e -> f, b == a -> c]
+  pprint $ min_unsat cs
   return ()
-
-tc2 :: (Type -> JM b) -> (Expr -> JM Type) -> Expr -> JM b
-tc2 k _ (ELit _ lit) = k (litType lit)
-tc2 k _ (EVar loc x) = do
-  scheme <- tcLookup loc x
-  t <- instantiate scheme
-  k t
-tc2 k self (ELam _ (VarPat loc x) e) = do
-  exists (idString x) $ \arg -> do
-  let arg_t = TyVar arg
-  t <- extendLocalEnv loc x arg_t $
-         self e
-  k (arg_t .->. t)
-tc2 k self (EApp loc e1 e2) = do
-  t1 <- self e1
-  t2 <- self e2
-  exists "@" $ \res -> do
-  unify loc t1 (t2 .->. res)
-  k (TyVar res)
 
 tst2 :: String
 tst2 = pretty $
@@ -367,49 +301,21 @@ chop s_ e0 = go s_ e0
           let (ne, m) = go s1 e in
           let n = supplyValue s0 in
           (n, IM.insert n (EAnn l (hole ne) t) m)
-    go s (EWrap _ _) = error "chop: unexpected EWrap"
+    go _ (EWrap _ _) = error "chop: unexpected EWrap"
     hole n = EWrap n (no_exp n)
     no_exp n = ELit noSrcSpan (IntLit n) --error "stripped expression"
 
---exprSet :: 
+----------------------------------------------------------------------
 
-{-
-tcExpr' :: GlobalEnv -> Expr -> JM Type
-tcExpr' gbl_env expr = do
-  local (\env -> env { tcLookupHook = my_tclookup
-                     , extendLocalEnvHook = my_extendLocalEnv
-                     , gblEnv = gbl_env }) $
-    my_tcExpr expr
-
- where
-   my_tclookup var _kont =
-     exists "$" $ \v -> do
---      modify (\st -> st { assumpts = M.insertWith (S.union) var (S.singleton v)
---                                                  (assumpts st) })
-     return (mkForall [v] [] (TyVar v))
-
-   my_tcExpr e@(EVar _ var) = do
-     t <- tc_expr my_tcExpr e
-     modify (\st -> st { assumpts = M.insertWith (S.union) var (S.singleton t)
-                                                 (assumpts st) })
-     return t
-   my_tcExpr e = tc_expr my_tcExpr e
-
-   my_extendLocalEnv var ty = do
-     as <- gets assumpts
-     case M.lookup var as of
-       Nothing -> return ()
-       Just tys -> do
-         forM_ (S.toList tys) $ \occ_ty -> do
-           unify noSrcSpan ty occ_ty
--}
-
-minimiseExpr :: Supply Int -> Supply Unique -> GlobalEnv -> Expr -> Expr
-minimiseExpr s_wrap s_vars gbl_env expr0 = 
-    buildMinExpr wrapped_expr minset top_expr
+minimiseExpr :: Supply Int -> Supply Unique -> GlobalEnv -> Expr
+             -> Expr
+minimiseExpr s_wrap s_vars gbl_env expr0 =
+    buildMinExpr chopped_expr_ minset top_expr
   where
-    (top_expr, wrapped_expr) = chop s_wrap expr0
-    minset = minUnsat' s_vars my_env wrapped_expr
+    (top_expr, chopped_expr_) = chop s_wrap expr0
+    chopped_expr = M.fromAscList (IM.toList chopped_expr_)
+    minset_ = M.keysSet (minUnsat emptyState solve chopped_expr)
+    minset = IS.fromAscList (S.toList minset_)
     my_env = emptyJEnv { tcLookupHook = my_tclookup
                        , gblEnv = gbl_env }
     my_tclookup _var kont =
@@ -417,51 +323,24 @@ minimiseExpr s_wrap s_vars gbl_env expr0 =
         exists "$" $ \v -> do
         return (mkForall [v] [] (TyVar v)))
 
-
-minUnsat' :: Supply Unique -> JEnv -> IM.IntMap Expr -> IS.IntSet
-minUnsat' suppl env all_cs = go emptyState IS.empty (IM.keysSet all_cs)
-  where
-    go min_state min_approx not_tried =
-      case minTcParts env min_state all_cs tyvars not_tried of
-        Left ci ->
-          let Just c_expr = IM.lookup ci all_cs in
-          let Just dummy_ty = IM.lookup ci tyvars in
-          --trace ("adding " ++ show ci) $
-          case stepJM env min_state (tc_one c_expr dummy_ty) of
-            (Left _, _) ->
-                IS.insert ci min_approx
-            (Right _, s') ->
-                go s' (IS.insert ci min_approx) (IS.delete ci not_tried)
-        Right _ -> IS.empty
-
-    tyvars = IM.fromAscList $ 
+    all_cs = chopped_expr_
+    tv_map = IM.fromAscList $ 
                [ (i, TyVar (mkTyVar (mkId s ("." ++ show i))))
-                 | (i, s) <- zip (IM.keys all_cs) (split suppl) ]
-    tc_one expr ty = do
-      (t, _free_vars) <- tcOne tyvars expr
-      unify noSrcSpan t ty
-      return t
+                 | (i, s) <- zip (IM.keys all_cs) (split s_vars) ]
+    
+    solve s ci expr =
+      let Just dummy_ty = IM.lookup ci tv_map in
+      case stepJM my_env s (tc_one expr dummy_ty) of
+        (Left err, _) -> Left err
+        (Right _, s') -> Right s'
 
-minTcParts :: JEnv -> JState -> IM.IntMap Expr -> IM.IntMap Type -> IS.IntSet -> Either Int JState
-minTcParts env solver_state all_cs tyvars try_these = go solver_state try_these
-  where
-    --go s cs | trace (pretty (s, cs)) False = undefined
-    go s cs =
-      case IS.minView cs of
-        Nothing -> Right s
-        Just (ci, cs') ->
-          let Just c_expr = IM.lookup ci all_cs in
-          let Just dummy_ty = IM.lookup ci tyvars in
-          case stepJM env s (tc_one c_expr dummy_ty) of
-            (Left _, _) -> Left ci
-            (Right _, s') -> go s' cs'
     tc_one expr ty = do
-      (t, _free_vars) <- tcOne tyvars expr
+      (t, _free_vars) <- tcOne tv_map expr
       unify noSrcSpan t ty
       return t
 
 tcOne :: IM.IntMap Type -> Expr -> JM (Type, M.Map Id (S.Set Type))
-tcOne tv_map e = go e 
+tcOne tv_map e_ = go e_
   where 
     go e@(EVar _ x) = do
       t <- tc_expr mkdummy e

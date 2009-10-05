@@ -48,6 +48,7 @@ Library
                               RPL.Typecheck.Env
                               RPL.Typecheck.Unify
                               RPL.Typecheck.Utils
+                              RPL.Typecheck.Minimise
                               RPL.Typecheck.AlgorithmW
                               RPL.Typecheck.J
                               RPL.Typecheck.MultiEquation
