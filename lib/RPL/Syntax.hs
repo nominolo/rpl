@@ -36,6 +36,7 @@ data Expr
   | EApp SrcSpan Expr Expr       -- E F
   | ELet SrcSpan Pat Expr Expr   -- let x = E in F
   | EAnn SrcSpan Expr Type       -- (e :: t)
+  | EWrap Int Expr
   deriving (Eq, Show)
 
 data Type
@@ -101,6 +102,7 @@ exprSpan expr = case expr of
   EApp s _ _   -> s
   ELet s _ _ _ -> s
   EAnn s _ _   -> s
+  EWrap _ e    -> exprSpan e
 
 typeSpan :: Type -> SrcSpan
 typeSpan ty = case ty of
@@ -154,9 +156,11 @@ patSpan pat = case pat of
 --
 -- Inverse of 'mkApp'.
 viewApp :: Expr -> (Expr, [Expr])
+viewApp (EWrap _ e) = viewApp e
 viewApp (EApp _ e1_0 e2_0) = go e1_0 [e2_0]
   where
     go (EApp _ e1 e2) args = go e1 (e2 : args)
+    go (EWrap _ e) args    = go e args
     go fun_expr       args = (fun_expr, args)
 viewApp expr = panic $
     text "viemMultiApp can only be applied to expressions of the form (EApp ...)"
@@ -187,6 +191,7 @@ instance Pretty Expr where
         keyword "let" <+> ppr v <+> char '=' <+> ppr e1 <+> keyword "in" $$
         ppr e2
     EAnn _ e t -> parens $ ppr e <+> text "::" <+> ppr t
+    EWrap _ e -> ppr e
 
 instance Pretty Type where
   ppr ty = case ty of
@@ -225,6 +230,7 @@ instance Pretty Program where
 ppr_lam :: Expr -> [Pat] -> PDoc
 ppr_lam inner_expr outer_pats =
   case inner_expr of
+    EWrap _ e -> ppr_lam e outer_pats
     ELam _ pat e -> ppr_lam e (pat : outer_pats)
     _otherwise -> 
       parens $ hang (char '\\' <> sep (map ppr (reverse outer_pats))

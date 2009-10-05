@@ -17,6 +17,8 @@ import qualified Text.PrettyPrint as P
 
 import Data.Map ( Map )
 import Data.Set ( Set )
+import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.ByteString.Lazy      as B
@@ -206,6 +208,9 @@ instance Pretty Bool where
   ppr True = text "True"
   ppr False = text "false"
 
+instance Pretty Int where
+  ppr n = text (show n)
+
 instance Pretty a => Pretty (Maybe a) where
   ppr Nothing = text "(nothing)"
   ppr (Just a) = ppr a
@@ -219,8 +224,16 @@ instance (Pretty a, Pretty b, Pretty c) => Pretty (a,b,c) where
 instance Pretty s => Pretty (Set s) where
   ppr s = braces (fsep (punctuate comma (map ppr (S.toList s))))
 
+instance Pretty IS.IntSet where
+  ppr s = braces (fsep (punctuate comma (map ppr (IS.toList s))))
+
 instance Pretty a => Pretty [a] where
   ppr l = brackets (fsep (punctuate comma (map ppr l)))
+
 instance (Pretty k, Pretty a) => Pretty (Map k a) where
   ppr s = braces (fsep (punctuate comma (map ppr_elem (M.toList s))))
+    where ppr_elem (k, v) = ppr k <> colon <+> ppr v
+
+instance (Pretty a) => Pretty (IM.IntMap a) where
+  ppr s = braces (fsep (punctuate comma (map ppr_elem (IM.toList s))))
     where ppr_elem (k, v) = ppr k <> colon <+> ppr v

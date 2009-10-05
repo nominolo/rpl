@@ -30,6 +30,8 @@ parseFlags (f:fs) (env, m) = parseFlags fs (env', m')
           (env{ solveOpts = (solveOpts env){ optDottyInitial = True }}, m)
         "-J" ->
           (env, AlgorithmJ)
+        "-K" ->
+          (env, AlgorithmK)
         "-G" ->
           (env, GraphicTypes)
         "-W" ->

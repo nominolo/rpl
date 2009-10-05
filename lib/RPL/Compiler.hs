@@ -15,6 +15,7 @@ import RPL.Type
 import RPL.Error
 import RPL.Utils.SrcLoc
 import RPL.Utils.Monads
+import RPL.Utils.Pretty
 import RPL.Typecheck.Env
 import RPL.Typecheck.AlgorithmW
 import RPL.Typecheck.Subst ( apply )
@@ -24,6 +25,7 @@ import qualified RPL.Typecheck.J as J
 import qualified Data.ByteString.Lazy.Char8 as BS
 import System.FilePath
 import Control.Applicative
+import Data.Supply
 
 ------------------------------------------------------------------------
 
@@ -69,6 +71,7 @@ data TcMode
   = AlgorithmW
   | GraphicTypes
   | AlgorithmJ
+  | AlgorithmK
 
 typecheck :: TcMode -> Syn.Program -> CompM Type
 typecheck AlgorithmW (Syn.Program _ expr) = do
@@ -86,4 +89,14 @@ typecheck AlgorithmJ (Syn.Program decls expr) = do
   env0 <- checkDecls decls
   case J.runJM (J.tcProgram env0 expr) of
     Left err -> throwError err
+    Right t -> return t
+typecheck AlgorithmK (Syn.Program decls expr) = do
+  env0 <- checkDecls decls
+  case J.runJM (J.tcProgram env0 expr) of
+    Left err -> do
+      s <- liftIO $ newSupply (0 :: Int) (1+)
+      liftIO $ pprint $ J.chop s expr
+      liftIO $ putStrLn $ replicate 60 '-'
+      liftIO $ pprint $ J.minimiseExpr s J.testSupply env0 expr
+      throwError err
     Right t -> return t
