@@ -1,0 +1,3 @@
+data Same a where { Same :: a -> a -> a -> Same a }
+data Char where { C :: Int -> Char }
+Same 65 (C 42) 54
