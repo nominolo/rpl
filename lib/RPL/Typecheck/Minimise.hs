@@ -77,3 +77,4 @@ minUnsat state0 run_one try_these = go state0 M.empty try_these
           case run_one s k e of
             Left _ -> Left (k, e)
             Right s' -> run_until_failure s' cs'
+

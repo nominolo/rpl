@@ -188,8 +188,8 @@ translate ct _env exp0 = do
 
         Syn.ELit _ l -> do
           let t = case l of
-                    Syn.IntLit _ -> Typ.typeInt
-                    Syn.CharLit _ -> Typ.typeChar
+                    Syn.IntLit _ -> Typ.intTyCon
+                    Syn.CharLit _ -> Typ.charTyCon
           new_bound_node (TyConNode t) []
 
         Syn.ELet _ (Syn.VarPat _ v) e1 e2 -> do

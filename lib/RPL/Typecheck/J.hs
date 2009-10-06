@@ -234,8 +234,8 @@ tst1 = do
   let l1:l2:l3:l4:l5:l6:l7:_ = locs
   let names = zipWith mkId (split s) simpleNames
   let a:b:c:d:e:f:g:_ = map (TyVar . mkTyVar) names
-  let tChar = TyCon typeChar
-  let tInt = TyCon typeInt
+  let tChar = typeChar
+  let tInt = typeInt
   let cs = map snd
            [ (l1, Uni a tChar), (l2, Uni b g), (l3, Uni e tInt),
              (l4, Uni f tInt), (l5, Uni g (e .->. f)),

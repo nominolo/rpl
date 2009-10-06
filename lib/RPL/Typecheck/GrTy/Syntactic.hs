@@ -77,7 +77,7 @@ fromType user_type = do
     lookupTyCon n = M.lookup (idString n) initialTypeEnv
     initialTypeEnv =
       M.fromList [ (idString (tyConName tc), tc) 
-                  | tc <- [typeInt, typeChar, typeMaybe] ]
+                  | tc <- [intTyCon, charTyCon, maybeTyCon] ]
 
 -- | Computes the coercion function for the given user type.
 -- 

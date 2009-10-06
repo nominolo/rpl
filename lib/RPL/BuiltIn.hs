@@ -7,17 +7,26 @@ import RPL.Typecheck.Subst
 
 import Data.List ( foldl' )
 
-typeInt :: TyCon
-typeInt = MkTyCon (Id (uniqueFromInt 0) "Int") 0
+intTyCon :: TyCon
+intTyCon = MkTyCon (Id (uniqueFromInt 0) "Int") 0
 
-typeChar :: TyCon
-typeChar = MkTyCon (Id (uniqueFromInt 0) "Char") 0
+charTyCon :: TyCon
+charTyCon = MkTyCon (Id (uniqueFromInt 0) "Char") 0
+
+maybeTyCon :: TyCon
+maybeTyCon = MkTyCon (Id (uniqueFromInt 0) "Maybe") 1
+
+
+typeInt :: Type
+typeInt = TyCon intTyCon
+
+typeChar :: Type
+typeChar = TyCon charTyCon
 
 initialTypeEnv :: Env Id TyCon
 initialTypeEnv =
   foldl' (\e -> uncurry (extendEnv e)) emptyEnv
-    [ (tyConName tc, tc) | tc <- [ typeInt, typeChar ] ]
+    [ (tyConName tc, tc) | tc <- [ intTyCon, charTyCon ] ]
 
-typeMaybe :: TyCon
-typeMaybe = MkTyCon (Id (uniqueFromInt 0) "Maybe") 1
-
+typeMaybe :: Type
+typeMaybe = TyCon maybeTyCon

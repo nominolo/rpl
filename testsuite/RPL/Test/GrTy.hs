@@ -59,7 +59,7 @@ tests = [ testGroup "graphic types" $
         liftIO $ b @? "Bare bottom nodes are congruent"
     , testCase "congruent/2" $ runM $ do
         n1 <- newNode Bot []
-        n2 <- newNode (TyConNode Typ.typeInt) []
+        n2 <- newNode (TyConNode Typ.intTyCon) []
         b <- congruent n1 n2
         liftIO $ not b @? "Int and variable are not congruent"
     , testCase "congruent/3" $ runM $ do
@@ -269,7 +269,7 @@ arbGrT = do
                  do (v_id,_,_,_) <- elements vars
                     return (v_id, all_nodes, next_id, vars))
             ,-- node is monomorphic
-             (1, do nsort <- elements [Typ.typeInt, Typ.typeChar]
+             (1, do nsort <- elements [Typ.intTyCon, Typ.charTyCon]
                     let bdr = if null parents then 0 else head parents
                     let new_node = (next_id, TyConNode nsort, bdr, [])
                     let all_nodes' = IM.insert next_id new_node all_nodes

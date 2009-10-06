@@ -20,8 +20,8 @@ import qualified Data.Map as M
 
 
 litType :: Lit -> Type
-litType (IntLit _) = TyCon typeInt
-litType (CharLit _) = TyCon typeChar
+litType (IntLit _) = typeInt
+litType (CharLit _) = typeChar
 
 fromUserType :: (Applicative m, MonadError SourceError m) =>
                 Env Id TyCon -> Syn.Type -> m TypeScheme
