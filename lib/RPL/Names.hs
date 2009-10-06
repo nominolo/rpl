@@ -18,6 +18,9 @@ data Id = Id !Unique String
 mkId :: Supply Unique -> String -> Id
 mkId s n = Id (supplyValue s) n
 
+mkId' :: Unique -> String -> Id
+mkId' u n = Id u n
+
 idString :: Id -> String
 idString (Id _ n) = n
 

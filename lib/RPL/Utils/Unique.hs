@@ -1,7 +1,7 @@
 module RPL.Utils.Unique (
   Unique,
   uniqueFromInt, intFromUnique, newUniqueSupply,
-  split, split2, split3, split4, supplyValue, modifySupply,
+  Supply, split, split2, split3, split4, supplyValue, modifySupply,
 ) where
 
 import RPL.Utils.Pretty

@@ -16,11 +16,13 @@ import RPL.Error
 import RPL.Utils.SrcLoc
 import RPL.Utils.Monads
 import RPL.Utils.Pretty
+import RPL.Utils.Unique
 import RPL.Typecheck.Env
 import RPL.Typecheck.AlgorithmW
 import RPL.Typecheck.Subst ( apply )
 import RPL.Typecheck.GrTy
 import qualified RPL.Typecheck.J as J
+import qualified RPL.Typecheck.Report as R
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 import System.FilePath
@@ -95,7 +97,8 @@ typecheck AlgorithmK (Syn.Program decls expr) = do
   case J.runJM (J.tcProgram env0 expr) of
     Left err -> do
       s <- liftIO $ newSupply (0 :: Int) (1+)
-      liftIO $ pprint $ J.chop s expr
+      s2 <- liftIO $ newUniqueSupply
+      liftIO $ pprint $ R.chop s2 expr
       liftIO $ putStrLn $ replicate 60 '-'
       liftIO $ pprint $ J.minimiseExpr s J.testSupply env0 expr
       throwError err
