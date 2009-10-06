@@ -13,6 +13,10 @@ import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
 import RPL.Typecheck.Monad
 import RPL.Typecheck.Utils
+import RPL.Typecheck.Minimise
+import RPL.Typecheck.Subst
+import RPL.Typecheck.Unify
+import RPL.Utils.Unique
 
 import Test.Framework as F (testGroup, Test)
 import Test.Framework.Providers.HUnit
@@ -20,6 +24,7 @@ import Test.HUnit
 import Test.QuickCheck
 import Data.Maybe ( isJust, isNothing )
 import Debug.Trace
+import qualified Data.Map as M
 
 tests :: [F.Test]
 tests = [ testGroup "typecheck" $
@@ -65,6 +70,20 @@ tests = [ testGroup "typecheck" $
       let s1 = mkForall [a] [] (typeInt .->. a)
           s2 = mkForall [b] [] (b .->. b)
       instanceOfCheck False s1 s2
+  ],
+
+  testGroup "minimise" $ 
+  [ testCase "min_unsat1" $ do
+      s <- newUniqueSupply
+      let names = zipWith mkId (split s) simpleNames
+      let a:b:c:d:e:f:g:_ = map (TyVar . mkTyVar) names
+      let cs = [ (a, typeChar),  (b, g),         (e, typeInt),
+                 (f, typeInt),   (g, e .->. f),
+                 (b, a .->. c),  (c, d) ]
+      -- min: [a == Char, b == g, e == Int, g == e -> f, b == a -> c]
+      let cs' = min_unsat cs
+      cs' @?= [ (a, typeChar),  (b, g),  (e, typeInt),
+                (g, e .->. f),  (b, a .->. c) ]
   ]]
 
 instanceOfCheck :: Bool -> TypeScheme -> TypeScheme -> TcM Assertion
@@ -82,6 +101,14 @@ runTcM' m =
 withTyVars :: ([TyVar] -> Assertion) -> Assertion
 withTyVars f = runTcM' $ f <$> mapM freshTyVar simpleNames
   
+
+min_unsat :: [(Type,Type)] -> [(Type,Type)]
+min_unsat cs = M.elems out
+  where
+    out = minUnsat emptyTySubst solve inp
+    inp = M.fromList $ zip [(1::Int)..] cs
+    solve s _ (t1, t2) = unify2 s t1 t2
+
 
 {-
 -- | Check whether the first argument is an instance of the second one.

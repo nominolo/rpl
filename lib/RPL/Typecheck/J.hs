@@ -15,13 +15,12 @@ import RPL.Syntax hiding ( Type(..) )
 import RPL.Error
 import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
-import RPL.BuiltIn
 import RPL.Utils.Monads
 import RPL.Utils.Unique
 
 import qualified Data.Set as S
 import Data.Supply
-import Data.List ( foldl', unfoldr )
+import Data.List ( foldl' )
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad.Error
 import Control.Monad.State
@@ -217,32 +216,6 @@ tcError :: SrcSpan -> ErrorMessage -> JM a
 tcError loc msg = throwError (SourceError loc msg)
 
 ----------------------------------------------------------------------
-
-min_unsat :: [JC] -> [JC]
-min_unsat cs = M.elems out
-  where
-    out = minUnsat emptyTySubst solve inp
-    inp = M.fromList $ zip [(1::Int)..] cs
-    solve s _ (Uni t1 t2) = unify2 s t1 t2
-
-tst1 :: IO ()
-tst1 = do
-  s <- newUniqueSupply
-  let locs = unfoldr (\l -> let l' = advanceSrcLoc l ' ' in
-                            Just (mkSrcSpan l l', l'))
-                     (startLoc "")
-  let l1:l2:l3:l4:l5:l6:l7:_ = locs
-  let names = zipWith mkId (split s) simpleNames
-  let a:b:c:d:e:f:g:_ = map (TyVar . mkTyVar) names
-  let tChar = typeChar
-  let tInt = typeInt
-  let cs = map snd
-           [ (l1, Uni a tChar), (l2, Uni b g), (l3, Uni e tInt),
-             (l4, Uni f tInt), (l5, Uni g (e .->. f)),
-             (l6, Uni b (a .->. c)), (l7, Uni c d) ]
-  -- min: [a == Char, b == g, e == Int, g == e -> f, b == a -> c]
-  pprint $ min_unsat cs
-  return ()
 
 tst2 :: String
 tst2 = pretty $
