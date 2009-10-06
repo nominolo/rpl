@@ -80,7 +80,7 @@ lib: $(DIST)/lib/build/libHSrpl-0.1.a
 comp: $(DIST)/rplc/build/rplc/rplc
 suite: $(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite
 test: suite
-	@./$(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite --maximum-generated-tests=5000 +RTS -N2
+	@./$(DIST)/testsuite/build/rpl-testsuite/rpl-testsuite --maximum-generated-tests=500 +RTS -N2
 
 clean:
 	@$(RM) -rf $(SETUP_DIST) $(DIST)
