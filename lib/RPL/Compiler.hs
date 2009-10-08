@@ -96,10 +96,9 @@ typecheck AlgorithmK (Syn.Program decls expr) = do
   env0 <- checkDecls decls
   case J.runJM (J.tcProgram env0 expr) of
     Left err -> do
-      s <- liftIO $ newSupply (0 :: Int) (1+)
-      s2 <- liftIO $ newUniqueSupply
-      liftIO $ pprint $ R.chop s2 expr
+      s <- liftIO newUniqueSupply
       liftIO $ putStrLn $ replicate 60 '-'
-      liftIO $ pprint $ J.minimiseExpr s J.testSupply env0 expr
+      let r = J.runJM (R.minSlice s env0 expr)
+      liftIO $ pprint r
       throwError err
     Right t -> return t
