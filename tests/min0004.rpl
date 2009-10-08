@@ -1,0 +1,4 @@
+data Pair a b where { Pair :: a -> b -> Pair a b }
+data A where { A :: A }
+\x -> Pair (Pair (Pair (x 42) A) (x 23))
+           (Pair (x A) 23)

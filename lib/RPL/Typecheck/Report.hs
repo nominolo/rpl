@@ -6,7 +6,7 @@ import RPL.Error
 import RPL.Typecheck.Env
 import RPL.Typecheck.J hiding ( chop )
 import RPL.Typecheck.Minimise
-import RPL.Syntax hiding ( Type(..) )
+import RPL.Syntax as Syn hiding ( Type(..) )
 import RPL.Utils.Unique
 import RPL.Utils.SrcLoc
 import RPL.Utils.Pretty
@@ -108,23 +108,46 @@ chop supply expr = go supply expr
                     m
 
 -- TODO: Is everything on the path to an element necessarily also in
--- the minimal slice?
+-- the minimal slice? ==> NO
 
-mkSlice :: (Id, M.Map Id Chunk) -> S.Set Id -> Expr
-mkSlice (toplevel, chunks) keep = 
+mkSlice :: Supply Unique -> (Id, M.Map Id Chunk) -> S.Set Id -> Expr
+mkSlice supply (toplevel, chunks) keep =
   --trace (pretty (toplevel, chunks, keep)) $ 
    go_ toplevel
  where
    chunk_ids = M.keysSet chunks
-   dotdot l i es =
-     -- TODO: fix id stuff
-     let is_dotdot (EVar _ n) = idString n == ".."
-         is_dotdot _ = False
-         (f:args) = dotdots (EVar l (mkId' (idUnique i) ".."))
-                            (filter (not . is_dotdot) es)
-     in mkApp f args
-   dotdots dot [] = [dot]
-   dotdots dot (e:es) = dot : e : dotdots dot es
+   (s1, s2) = split2 supply
+
+   -- We represent the empty slice by 'dotdot' and any non-empty slice
+   -- by (dotdot_fn e_1 dotdot ... dotdot e_n dotdot).
+   --
+   -- Note the use of dotdot_fn so that we can distinguish slices from
+   -- applications where the function doesn't matter, i.e.:
+   --   (dotdot e_1 ...)
+   dotFnSpan = unhelpfulSpan "dotdot_fn"
+   dotdot = EVar (noSrcSpan) (mkId s1 "..")
+   dotdot_fn = EVar dotFnSpan (mkId s2 "..")
+
+   dots [] = dotdot
+   dots es =
+     let ilv [] = []
+         ilv (x:xs) = x : dotdot : ilv xs
+     in mkApp dotdot_fn (ilv es)
+
+   --
+   -- viewDots (dots xs) == xs
+   --
+   viewDots e@(EVar _ _)
+     | e == dotdot = Just []
+     | otherwise   = Nothing
+   viewDots e@(EApp _ _ _) =
+     let (f, args) = Syn.viewApp e in
+     if f == dotdot_fn then
+       let un_ilv (x:_:xs) = x : un_ilv xs
+           un_ilv _ = []
+       in Just (un_ilv args)
+     else Nothing
+   viewDots _ = Nothing
 
    go_ nid = go (EVar noSrcSpan nid)
    go e@(EVar _ n)
@@ -132,13 +155,22 @@ mkSlice (toplevel, chunks) keep =
      | n `S.member` chunk_ids =
         let Chunk expr sub_chunks _ _ = chunks M.! n in
         if n `S.member` keep then go expr
-        else dotdot (getSpan expr) n (map go_ sub_chunks)
+        else merge (map go_ sub_chunks)
      | otherwise = e
    go e@(ELit _ _) = e
    go (EApp l e1 e2) = EApp l (go e1) (go e2)
    go (ELam l x e1) = ELam l x (go e1)
    go (ELet l x e1 e2) = ELet l x (go e1) (go e2)
    go (EAnn l e t) = EAnn l (go e) t
+
+   merge es0 = dots (merge' es0)
+     where
+       --merge' es | trace (pretty es) False = undefined
+       merge' [] = []
+       merge' (e:es) =
+         case viewDots e of
+           Nothing -> e : merge' es
+           Just ds -> merge' ds ++ merge' es
 
 -- * Minimal Slice
 
@@ -265,7 +297,7 @@ minSlice :: Supply Unique -> GlobalEnv -> Expr -> JM Expr
 minSlice supply env0 expr = do
   st <- mkTcChunkState env0 all_chunks
   let m = minUnsat' st tcChunk pick_next del all_chunks
-  return $ mkSlice (top, all_chunks) (M.keysSet m)
+  return $ mkSlice supply (top, all_chunks) (M.keysSet m)
  where
    (top, all_chunks) = chop supply expr
 

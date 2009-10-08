@@ -163,6 +163,9 @@ mkSrcSpan loc1 loc2
 noSrcSpan :: SrcSpan
 noSrcSpan = UnhelpfulSpan "<no location info>"
 
+unhelpfulSpan :: FastString -> SrcSpan
+unhelpfulSpan = UnhelpfulSpan
+
 extendLeft :: SrcLoc -> SrcSpan -> SrcSpan
 extendLeft l s = mkSrcSpan l (srcSpanEndLoc s)
 
