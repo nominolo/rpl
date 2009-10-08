@@ -52,6 +52,10 @@ data JEnv = JEnv
   , lclEnv :: LocalEnv
   }
 
+instance Pretty JEnv where
+  ppr env = text "global:" <+> ppr (gblEnv env) $+$
+            text "local: " <+> ppr (lclEnv env)
+
 type LocalEnv = Env Id Type
 type TypeEnv = Env Id TypeScheme
 type UVar = TyVar
@@ -180,6 +184,18 @@ exists nm body = do
 existsTy :: String -> (Type -> JM a) -> JM a
 existsTy n k = exists n $ \v -> k (TyVar v)
 
+existIds :: S.Set Id -> (M.Map Id Type -> JM a) -> JM a
+existIds id_set k = do
+  s <- gets freshs
+  let ss = split s
+      ids = S.toList id_set
+      r = M.fromAscList $ 
+           [ (i, TyVar (mkTyVar (mkId s ("t" ++ idString i))))
+             | (s,i) <- zip ss ids ]
+      s':_ = drop (M.size r) ss
+  modify $ \st -> st { freshs = s' }
+  k r
+
 extendGlobalEnv :: SrcSpan -> Id -> TypeScheme -> JM a -> JM a
 extendGlobalEnv _bind_site var ty_scheme body = do
   hook <- asks extendGlobalEnvHook
@@ -191,6 +207,11 @@ extendLocalEnv _bind_site var ty body = do
   hook <- asks extendLocalEnvHook
   hook var ty
   local (\env -> env { lclEnv = extendEnv (lclEnv env) var ty }) body
+
+extendLocalEnvN :: [(Id, Type)] -> JM a -> JM a
+extendLocalEnvN [] m = m
+extendLocalEnvN ((x,ty):binds) m =
+  extendLocalEnv noSrcSpan x ty (extendLocalEnvN binds m)
 
 unify :: SrcSpan -> Type -> Type -> JM ()
 unify site t1 t2 = do

@@ -22,6 +22,11 @@ data GlobalEnv = GlobalEnv
 type TypeEnv = Env Id TyCon
 type NameEnv = Env Id TypeScheme
 
+instance Pretty GlobalEnv where
+  ppr genv =
+    text "type-env:" <+> ppr (gblTypeEnv genv) $+$
+    text "name-env:" <+> ppr (gblNameEnv genv)
+
 emptyGlobalEnv :: GlobalEnv
 emptyGlobalEnv = GlobalEnv initialTypeEnv emptyEnv
 

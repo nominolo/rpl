@@ -152,6 +152,9 @@ lookupEnv (Env m) x = M.lookup x m
 extendEnv :: Ord i => Env i t -> i -> t -> Env i t
 extendEnv (Env m) x ts = Env (M.insert x ts m)
 
+extendEnvN :: Ord i => Env i t -> [(i,t)] -> Env i t
+extendEnvN m ms = foldl' (\m' (i,t) -> extendEnv m' i t) m ms
+
 envDomain :: Ord i => Env i t -> Set i
 envDomain (Env m) = M.keysSet m
 
