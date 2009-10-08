@@ -1,10 +1,10 @@
 default: all
 
-# include config.mk
+-include config.mk
 
 exeext =
 
-# If not set in custom config.mk, use the inplace GHC
+# If not set in custom config.mk, use these defaults
 HC            ?= ghc
 PKG           ?= ghc-pkg
 HADDOCK       ?= haddock
