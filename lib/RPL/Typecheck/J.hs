@@ -110,7 +110,6 @@ tcExpr expr = do
 --logDumb expr $ tc_expr tcExpr expr
 
 tc_expr :: (Expr -> JM Type) -> Expr -> JM Type
-tc_expr self (EWrap _ e) = self e
 
 tc_expr _self (ELit _ lit) = do
   return (litType lit)
