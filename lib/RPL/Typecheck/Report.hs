@@ -4,7 +4,7 @@ module RPL.Typecheck.Report where
 import RPL.Type
 import RPL.Error
 import RPL.Typecheck.Env
-import RPL.Typecheck.J hiding ( chop )
+import RPL.Typecheck.J
 import RPL.Typecheck.Minimise
 import RPL.Syntax as Syn hiding ( Type(..) )
 import RPL.Utils.Unique

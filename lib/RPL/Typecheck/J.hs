@@ -7,7 +7,6 @@ import RPL.Typecheck.Subst
 import RPL.Typecheck.Env
 import RPL.Typecheck.Unify hiding ( unify )
 import RPL.Typecheck.Utils hiding ( instantiate )
-import RPL.Typecheck.Minimise
 
 import RPL.Type
 import RPL.Type.Tidy
@@ -25,8 +24,6 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad.Error
 import Control.Monad.State
 import qualified Data.Map as M
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
 
 data JC = Uni Type Type deriving Eq
 
@@ -91,6 +88,12 @@ execJM m = (res, st)
     m2 = runErrorT m1
     (res, st) = runState m2 emptyState
 
+stepJM :: JEnv -> JState -> JM a -> (Either SourceError a, JState)
+stepJM env st (JM m) = m3
+  where
+    m1 = runReaderT m env
+    m2 = runErrorT m1
+    m3 = runState m2 st
 
 tcProgram :: GlobalEnv -> Expr -> JM Type
 tcProgram gbl_env e =
@@ -186,8 +189,8 @@ existsTy n k = exists n $ \v -> k (TyVar v)
 
 existIds :: S.Set Id -> (M.Map Id Type -> JM a) -> JM a
 existIds id_set k = do
-  s <- gets freshs
-  let ss = split s
+  s0 <- gets freshs
+  let ss = split s0
       ids = S.toList id_set
       r = M.fromAscList $ 
            [ (i, TyVar (mkTyVar (mkId s ("t" ++ idString i))))
@@ -235,134 +238,3 @@ tcLookup loc var = do
 
 tcError :: SrcSpan -> ErrorMessage -> JM a
 tcError loc msg = throwError (SourceError loc msg)
-
-----------------------------------------------------------------------
-
-tst2 :: String
-tst2 = pretty $
-  execJM $ do
-    let mkdummy = (\_ -> exists "%" $ \b -> return (TyVar b))
-    tc_expr mkdummy (EApp noSrcSpan undefined undefined)
-
-wrapAll :: Supply Int -> Expr -> Expr
-wrapAll s_ e0 = go s_ e0
-  where
-    wrap s e = EWrap (supplyValue s) e
-    go s e@(ELit _ _) = wrap s e
-    go s e@(EVar _ _) = wrap s e
-    go s (ELam l p e) =
-        case split2 s of
-          (s0, s1) -> wrap s0 (ELam l p (go s1 e))
-    go s (EApp l e1 e2) =
-        case split3 s of
-          (s0, s1, s2) -> wrap s0 (EApp l (go s1 e1) (go s2 e2))
-    go s (ELet l p e1 e2) =
-        case split3 s of
-          (s0, s1, s2) -> wrap s0 (ELet l p (go s1 e1) (go s2 e2))
-    go s (EAnn l e t) =
-        case split2 s of
-          (s0, s1) -> wrap s0 (EAnn l (go s1 e) t)
-    go s (EWrap _ e) = wrap s e  -- replace existing wraps
-
-chop :: Supply Int -> Expr -> (Int, IM.IntMap Expr)
-chop s_ e0 = go s_ e0
-  where
-    go s e@(ELit _ _) = let n = supplyValue s in (n, IM.singleton n e)
-    go s e@(EVar _ _) = let n = supplyValue s in (n, IM.singleton n e)
-    go s (ELam l p e) =
-      case split2 s of
-        (s0, s1) -> 
-          let (ne, m) = go s1 e in
-          let n = supplyValue s0 in
-          (n, IM.insert n (ELam l p (hole ne)) m)
-    go s (EApp l e1 e2) =
-      case split3 s of
-        (s0, s1, s2) ->
-            let (ne1, m1) = go s1 e1
-                (ne2, m2) = go s2 e2
-                n = supplyValue s0
-            in (n, IM.insert n (EApp l (hole ne1) (hole ne2)) (m1 `IM.union` m2))
-    go s (ELet l p e1 e2) =
-      case split3 s of
-        (s0, s1, s2) ->
-            let (ne1, m1) = go s1 e1
-                (ne2, m2) = go s2 e2
-                n = supplyValue s0
-            in (n, IM.insert n (ELet l p (hole ne1) (hole ne2)) (m1 `IM.union` m2))
-    go s (EAnn l e t) =
-      case split2 s of
-        (s0, s1) ->
-          let (ne, m) = go s1 e in
-          let n = supplyValue s0 in
-          (n, IM.insert n (EAnn l (hole ne) t) m)
-    go _ (EWrap _ _) = error "chop: unexpected EWrap"
-    hole n = EWrap n (no_exp n)
-    no_exp n = ELit noSrcSpan (IntLit n) --error "stripped expression"
-
-----------------------------------------------------------------------
-
-minimiseExpr :: Supply Int -> Supply Unique -> GlobalEnv -> Expr
-             -> Expr
-minimiseExpr s_wrap s_vars gbl_env expr0 =
-    buildMinExpr chopped_expr_ minset top_expr
-  where
-    (top_expr, chopped_expr_) = chop s_wrap expr0
-    chopped_expr = M.fromAscList (IM.toList chopped_expr_)
-    minset_ = M.keysSet (minUnsat emptyState solve chopped_expr)
-    minset = IS.fromAscList (S.toList minset_)
-    my_env = emptyJEnv { tcLookupHook = my_tclookup
-                       , gblEnv = gbl_env }
-    my_tclookup _var kont =
-      kont `catchError` (\_ -> 
-        exists "$" $ \v -> do
-        return (mkForall [v] [] (TyVar v)))
-
-    all_cs = chopped_expr_
-    tv_map = IM.fromAscList $ 
-               [ (i, TyVar (mkTyVar (mkId s ("." ++ show i))))
-                 | (i, s) <- zip (IM.keys all_cs) (split s_vars) ]
-    
-    solve s ci expr =
-      let Just dummy_ty = IM.lookup ci tv_map in
-      case stepJM my_env s (tc_one expr dummy_ty) of
-        (Left err, _) -> Left err
-        (Right _, s') -> Right s'
-
-    tc_one expr ty = do
-      (t, _free_vars) <- tcOne tv_map expr
-      unify noSrcSpan t ty
-      return t
-
-tcOne :: IM.IntMap Type -> Expr -> JM (Type, M.Map Id (S.Set Type))
-tcOne tv_map e_ = go e_
-  where 
-    go e@(EVar _ x) = do
-      t <- tc_expr mkdummy e
-      return (t, M.singleton x (S.singleton t))
-    go e = do
-      t <- tc_expr mkdummy e
-      return (t, M.empty)
-
-    mkdummy (EWrap n _) | Just t <- IM.lookup n tv_map = return t
-    mkdummy _ = error "tcOne: no wrapper"
-
-stepJM :: JEnv -> JState -> JM a -> (Either SourceError a, JState)
-stepJM env st (JM m) = m3
-  where
-    m1 = runReaderT m env
-    m2 = runErrorT m1
-    m3 = runState m2 st
-
-buildMinExpr :: IM.IntMap Expr -> IS.IntSet -> Int -> Expr
-buildMinExpr pieces keep root = go (pieces IM.! root)
- where
-   go e@(EVar _ _) = e
-   go e@(ELit _ _) = e
-   go (EApp l e1 e2) = EApp l (go e1) (go e2)
-   go (ELam l x e1) = ELam l x (go e1)
-   go (ELet l x e1 e2) = ELet l x (go e1) (go e2)
-   go (EAnn l e t) = EAnn l (go e) t
-   go (EWrap n _)
-     | n `IS.member` keep =
-         let Just e = IM.lookup n pieces in go e
-     | otherwise = EVar noSrcSpan (mkId testSupply "..")
