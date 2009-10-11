@@ -1,0 +1,3 @@
+data A where { A :: A }
+let f = \x y -> y (x 42) (x A) in
+f (\z -> z) (\z -> z)

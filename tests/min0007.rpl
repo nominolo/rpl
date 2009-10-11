@@ -1,0 +1,4 @@
+data Pair a b where { Pair :: a -> b -> Pair a b }
+data A where { A :: A }
+let f = \x -> Pair x x in
+Pair (f 42) (f 1 2)
