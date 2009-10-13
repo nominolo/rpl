@@ -96,9 +96,13 @@ typecheck AlgorithmK (Syn.Program decls expr) = do
   env0 <- checkDecls decls
   case J.runJM (J.tcProgram env0 expr) of
     Left err -> do
-      s <- liftIO newUniqueSupply
+      (s1, s2) <- split2 `fmap` liftIO newUniqueSupply
       liftIO $ putStrLn $ replicate 60 '-'
-      let r = J.runJM (R.minSlice s env0 expr)
+      let r@(_, cs) = R.chop s1 expr
       liftIO $ pprint r
+--       let r' = J.runJM (do st <- R.mkTcChunkState s2 env0 cs
+--                            return (R.tst1 st cs))
+      let r' = R.minSlice s2 env0 expr
+      liftIO $ pprint r'
       throwError err
     Right t -> return t

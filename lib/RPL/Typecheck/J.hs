@@ -186,6 +186,10 @@ exists nm body = do
 existsTy :: String -> (Type -> JM a) -> JM a
 existsTy n k = exists n $ \v -> k (TyVar v)
 
+existsId :: Id -> (Type -> JM a) -> JM a
+existsId i k = do
+  existsTy ("t" ++ idString i) $ k
+
 existIds :: S.Set Id -> (M.Map Id Type -> JM a) -> JM a
 existIds id_set k = do
   s0 <- gets freshs
@@ -209,6 +213,12 @@ extendLocalEnv _bind_site var ty body = do
   hook <- asks extendLocalEnvHook
   hook var ty
   local (\env -> env { lclEnv = extendEnv (lclEnv env) var ty }) body
+
+extendLocalEnv' :: JEnv -> Id -> Type -> JEnv
+extendLocalEnv' env var ty = env { lclEnv = extendEnv (lclEnv env) var ty }
+
+setGlobalEnv :: JEnv -> GlobalEnv -> JEnv
+setGlobalEnv env gbl_env = env { gblEnv = gbl_env }
 
 extendLocalEnvN :: [(Id, Type)] -> JM a -> JM a
 extendLocalEnvN [] m = m
